@@ -58,7 +58,7 @@ export function RegistrationForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="space-y-2">
-        <Label htmlFor="name" className="text-base font-medium">
+        <Label htmlFor="name" className="text-sm font-medium">
           Name
         </Label>
         <Input
@@ -73,7 +73,7 @@ export function RegistrationForm() {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="email" className="text-base font-medium">
+        <Label htmlFor="email" className="text-sm font-medium">
           Email
         </Label>
         <Input
@@ -101,8 +101,8 @@ export function RegistrationForm() {
 
       {error && <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
 
-      <Button type="submit" size="lg" className="h-14 w-full text-lg font-semibold" disabled={isLoading}>
-        {isLoading ? "Entering lottery..." : "Enter today's lottery"}
+      <Button type="submit" size="lg" className="h-14 w-full text-lg font-semibold border" disabled={isLoading}>
+        {isLoading ? "Entering tickets..." : "Get today's ticket"}
       </Button>
 
       <p className="text-center text-sm leading-relaxed text-muted-foreground">
