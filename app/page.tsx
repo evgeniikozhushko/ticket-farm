@@ -1,4 +1,5 @@
 import Link from "next/link"
+import Image from "next/image"
 import { RegistrationForm } from "@/components/registration-form"
 
 export default function HomePage() {
@@ -10,7 +11,8 @@ export default function HomePage() {
   })
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-linear-135 from-stone-100 from-10% to-lime-200 to-90%">
+   {/* bg-background */}
       <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Header */}
         <header className="mb-8 mt-14 text-center">
@@ -39,6 +41,13 @@ export default function HomePage() {
             </Link>
           </div>
         </div>
+
+        {/* <Image
+        src="/scott-webb-4yNeDDMcJJM-unsplash.jpg"
+        fill={true}
+        className="object-cover -z-10"
+        alt="Picture of lettuce"
+      ></Image> */}
 
         {/* Today's Theme Badge */}
         {/* <div className="mb-6 flex items-center justify-center gap-3 rounded-md bg-secondary p-4 border">
