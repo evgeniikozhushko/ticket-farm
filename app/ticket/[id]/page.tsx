@@ -32,11 +32,11 @@ export default function TicketPage({ params }: { params: { id: string } }) {
 					<div className="mb-2 flex items-center justify-center gap-2">
 						<h1 className="text-4xl font-bold text-foreground">Canmore Food Recovery Barn</h1>
 					</div>
-					<p className="text-med font-medium text-muted-foreground uppercaseb">Food Recovery Lottery</p>
+					<p className="text-med font-medium text-muted-foreground uppercaseb"></p>
 				</header>
 
 				{/* Digital Ticket */}
-				<div className="rounded-2xl bg-card p-6 shadow-2xl sm:p-8 border">
+				<div className="rounded-sm bg-card p-6 shadow-2xl sm:p-8 border">
 
 					<div className="flex items-center justify-between gap-6 mb-8">
 						{/* Ticket Details */}

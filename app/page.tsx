@@ -19,16 +19,16 @@ export default function HomePage() {
           <div className="mb-2 flex items-center justify-center gap-2">
             <h1 className="text-4xl font-bold text-foreground">Canmore Food Recovery Barn</h1>
           </div>
-          <p className="text-med font-medium text-muted-foreground uppercaseb">Food Recovery Lottery</p>
+          <p className="text-lg font-medium text-muted-foreground uppercaseb">Join Us In Our Mission To Recover Edible Food Destined For Landfill</p>
         </header>
 
         {/* Main Card */}
-        <div className="rounded-md bg-card p-6 shadow-lg sm:p-8 border mb-6">
+        <div className="rounded-md bg-card p-6 shadow-lg sm:p-8 mb-6">
           <div className="mb-10 space-y-2 text-center">
             <p className="text-sm font-medium text-muted-foreground uppercase">{today}</p>
             <h2 className="text-2xl font-bold text-balance text-foreground mb-8">Enter {"Today's"} Lottery</h2>
             <p className="text-pretty leading-relaxed text-muted-foreground">
-              This is a daily lottery, not first-come-first-served. Pickup starts at 5:30 PM. If you are selected,{" "}
+              This is a daily lottery, not first-come-first-served. Pickup starts at 5:30 PM. <br /> If you are selected,{" "}
               {"you'll"} receive an email with your digital ticket.
             </p>
           </div>
@@ -61,7 +61,7 @@ export default function HomePage() {
         </div> */}
 
         {/* Footer */}
-        <footer className="mt-8 text-center text-sm text-muted-foreground uppercase">
+        <footer className="mt-8 text-center text-sm text-muted-foreground">
           <p>Canmore Food Recovery Program</p>
         </footer>
       </div>

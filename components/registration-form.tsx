@@ -105,9 +105,9 @@ export function RegistrationForm() {
         {isLoading ? "Entering tickets..." : "Get today's ticket"}
       </Button>
 
-      <p className="text-center text-sm leading-relaxed text-muted-foreground">
+      {/* <p className="text-center text-sm leading-relaxed text-muted-foreground">
         If you are selected, you will receive an email with your ticket and pickup time.
-      </p>
+      </p> */}
     </form>
   )
 }
