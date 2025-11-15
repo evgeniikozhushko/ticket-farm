@@ -24,7 +24,7 @@ export default function WinnersPage() {
     { ticketNumber: "001", status: "5:30 PM"},
     { ticketNumber: "002", status: "5:30 PM"},
     { ticketNumber: "003", status: "5:30 PM"},
-    { ticketNumber: "004", status: "5:30 PM"},
+    { ticketNumber: "004", status: "Canceled"},
     { ticketNumber: "005", status: "5:30 PM"},
     { ticketNumber: "006", status: "5:30 PM"},
     { ticketNumber: "007", status: "Canceled" },

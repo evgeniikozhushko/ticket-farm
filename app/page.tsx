@@ -19,7 +19,7 @@ export default function HomePage() {
           <div className="mb-2 flex items-center justify-center gap-2">
             <h1 className="text-4xl font-bold text-foreground">Canmore Food Recovery Barn</h1>
           </div>
-          <p className="text-lg font-medium text-muted-foreground uppercaseb">Join Us In Our Mission To Recover Edible Food Destined For Landfill</p>
+          <p className="text-1xl font-medium text-muted-foreground uppercase">Join Us In Our Mission To Recover Edible Food Destined For Landfill</p>
         </header>
 
         {/* Main Card */}
