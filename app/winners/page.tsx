@@ -38,6 +38,13 @@ export default async function WinnersPage() {
   // Fetch winning tickets from database
   const winners = await getTodayWinners()
 
+   /**
+   * Format ticket number with zero padding (1 → "001", 27 → "027")
+   */
+   function formatTicketNumber(num: number): string {
+    return String(num).padStart(3, "0")
+  }
+
   /**
    * Determine status display color based on ticket status
    */
