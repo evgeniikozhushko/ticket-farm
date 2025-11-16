@@ -1,6 +1,33 @@
 import Link from "next/link"
+import { getTicketsCollection } from "@/lib/mongodb"
+import { getTodayDateString } from "@/lib/date"
+import type { Ticket } from '@/lib/types'
 
-export default function WinnersPage() {
+/**
+ * Server-side function to fetch today's winning tickets from MongoDB.
+ * Returns tickets with ACTIVE or CANCELED status, sorted by ticket number.
+ */
+
+async function getTodayWinners(): Promise<Ticket[]> {
+  const collection = await getTicketsCollection()
+  const date = getTodayDateString()
+
+   // Query tickets for today, include ACTIVE and CANCELED
+   const tickets = await collection.find({
+    date,
+    status: { $in: ["ACTIVE", "CANCELED"]}
+   })
+   .sort({ ticketNumber: 1 })
+   .toArray()
+
+   return tickets
+}
+
+/**
+ * Winners page - displays today's winning tickets publicly.
+ * Shows ticket numbers and IDs (no personal information).
+ */
+export default async function WinnersPage() {
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",
     year: "numeric",
@@ -8,30 +35,18 @@ export default function WinnersPage() {
     day: "numeric",
   })
 
-  // const winners = [
-  //   { ticketNumber: "001", status: "5:30 PM", id: {ticket.id} },
-  //   { ticketNumber: "002", status: "5:30 PM", id: {ticket.id} },
-  //   { ticketNumber: "003", status: "5:30 PM", id: {ticket.id} },
-  //   { ticketNumber: "004", status: "5:30 PM", id: {ticket.id} },
-  //   { ticketNumber: "005", status: "5:30 PM", id: {ticket.id} },
-  //   { ticketNumber: "006", status: "5:30 PM", id: {ticket.id} },
-  //   { ticketNumber: "007", status: "Canceled", id: {ticket.id} },
-  //   { ticketNumber: "008", status: "5:30 PM", id: {ticket.id} },
-  //   { ticketNumber: "009", status: "5:30 PM", id: {ticket.id} },
-  //   { ticketNumber: "010", status: "5:30 PM", id: {ticket.id} },
-  // ]
-    const winners = [
-    { ticketNumber: "001", status: "5:30 PM"},
-    { ticketNumber: "002", status: "5:30 PM"},
-    { ticketNumber: "003", status: "5:30 PM"},
-    { ticketNumber: "004", status: "Canceled"},
-    { ticketNumber: "005", status: "5:30 PM"},
-    { ticketNumber: "006", status: "5:30 PM"},
-    { ticketNumber: "007", status: "Canceled" },
-    { ticketNumber: "008", status: "5:30 PM"},
-    { ticketNumber: "009", status: "5:30 PM"},
-    { ticketNumber: "010", status: "5:30 PM"},
-  ]
+  // Fetch winning tickets from database
+  const winners = await getTodayWinners()
+
+  /**
+   * Determine status display color based on ticket status
+   */
+  function getStatusColor(status: Ticket["status"]): string {
+    if (status === "CANCELED") {
+      return "text-destructive"
+    }
+    return "text-primary" // ACTIVE tickets
+  }
 
   return (
     <div className="min-h-screen bg-linear-135 from-stone-100 from-10% to-lime-200 to-90%">
@@ -47,19 +62,7 @@ export default function WinnersPage() {
           <div className="mb-2 flex items-center justify-center gap-2">
             <h1 className="text-4xl font-bold text-foreground">Canmore Food Recovery Barn</h1>
           </div>
-          {/* <p className="text-lg text-muted-foreground">Food Recovery Lottery</p> */}
         </header>
-
-        {/* Today's Theme Badge */}
-        {/* <div className="mb-6 flex items-center justify-center gap-3 rounded-xl bg-secondary p-4">
-          <div className="text-6xl" role="img" aria-label="Strawberry">
-            🍓
-          </div>
-          <div className="text-left">
-            <p className="text-sm font-medium text-muted-foreground">{"Today's Theme"}</p>
-            <p className="text-2xl font-bold text-foreground">Strawberry</p>
-          </div>
-        </div> */}
 
         {/* Winners Card */}
         <div className="rounded-2xl bg-card p-6 shadow-lg sm:p-8">
@@ -67,30 +70,47 @@ export default function WinnersPage() {
             <p className="text-sm font-medium text-muted-foreground uppercase">{today}</p>
             <h2 className="text-2xl font-bold text-balance text-foreground">{"Today's"} Winning Tickets</h2>
             <p className="text-pretty leading-relaxed text-muted-foreground">
-              If your ticket number is listed as a winner, please check your email for your digital ticket.
+              {winners.length === 0 
+                ? "No winners have been drawn yet. Check back later!"
+                : "If your ticket number is listed below, check your email for your digital ticket."
+              }
             </p>
           </div>
 
-          <div className="space-y-3">
-            {winners.map((winner) => (
-              <div
-                key={winner.ticketNumber}
-                className="flex items-center justify-between rounded-lg border border-border bg-secondary/30 px-4 py-3 sm:px-6"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="font-mono text-lg font-bold text-foreground">#{winner.ticketNumber}</span>
-                </div>
-                <span
-                  className={`text-sm font-medium ${
-                    winner.status === "Canceled" ? "text-destructive" : "text-primary"
-                  }`}
+          {/* Tickets List or Empty State */}
+          {winners.length > 0 ? (
+            <div className="space-y-3">
+              {winners.map((winner) => (
+                <div
+                  key={winner._id?.toString()}
+                  className="flex items-center justify-between rounded-lg border border-border bg-secondary/30 px-4 py-3 sm:px-6"
                 >
-                  {winner.status}
-                </span>
-              </div>
-            ))}
-          </div>
+                  {/* Left: Ticket Number */}
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono text-lg font-bold text-foreground">
+                      #{formatTicketNumber(winner.ticketNumber)}
+                    </span>
+                  </div>
 
+                  {/* Right: Ticket ID */}
+                  <span className={`font-mono text-sm font-medium ${getStatusColor(winner.status)}`}>
+                    {winner.ticketId}
+                    {winner.status === "CANCELED" && (
+                      <span className="ml-2 text-xs">(Canceled)</span>
+                    )}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            // Empty state when no tickets exist
+            <div className="py-8 text-center text-muted-foreground">
+              <p className="text-lg font-medium">The lottery hasn't been drawn yet.</p>
+              <p className="mt-2 text-sm">Winners will appear here once the admin runs today's lottery.</p>
+            </div>
+          )}
+
+          {/* Info Footer */}
           <div className="mt-6 rounded-lg bg-secondary/50 p-4">
             <p className="text-center text-sm leading-relaxed text-muted-foreground">
               Winners receive their digital ticket via email. Show your ticket at the door during your pickup time.
