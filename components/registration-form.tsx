@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
-import { enterLottery } from '@/app/lib/actions/lottery.actions'
+import { enterLottery } from '@/lib/actions/lottery.actions'
 
 export function RegistrationForm() {
   const [name, setName] = useState("")
@@ -63,6 +63,7 @@ export function RegistrationForm() {
         </Label>
         <Input
           id="name"
+          name="name"
           type="text"
           placeholder="Enter your name"
           value={name}
@@ -78,6 +79,7 @@ export function RegistrationForm() {
         </Label>
         <Input
           id="email"
+          name="email" 
           type="email"
           placeholder="your.email@example.com"
           value={email}
@@ -97,6 +99,7 @@ export function RegistrationForm() {
         <label htmlFor="consent" className="cursor-pointer text-sm leading-relaxed text-foreground">
           I understand this is a lottery and not everyone will be selected.
         </label>
+        <input type="hidden" name="consent" value={consent ? "true" : "false"} />
       </div>
 
       {error && <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
