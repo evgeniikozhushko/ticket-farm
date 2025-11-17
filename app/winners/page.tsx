@@ -56,7 +56,8 @@ export default async function WinnersPage() {
   }
 
   return (
-    <div className="min-h-screen bg-linear-135 from-stone-100 from-10% to-lime-200 to-90%">
+    <div className="min-h-screen bg-background">
+      {/* bg-linear-135 from-stone-100 from-10% to-lime-200 to-90% */}
       <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Header */}
         <header className="mb-8 text-center">
