@@ -18,6 +18,25 @@ export default async function LotteryAdminPage() {
     getTodayWinners(),
   ]);
 
+  // Serialize MongoDB data for client components
+  // Convert ObjectId and Date objects to plain strings for React serialization
+  const serializedStats = {
+    ...stats,
+    drawnAt: stats.drawnAt?.toISOString(),
+  } as any;
+
+  const serializedRegistrants = registrants.map((r) => ({
+    ...r,
+    _id: r._id?.toString() ?? "",
+    enteredAt: r.enteredAt.toISOString(),
+  })) as any;
+
+  const serializedWinners = winners.map((w) => ({
+    ...w,
+    _id: w._id.toString(),
+    enteredAt: w.enteredAt.toISOString(),
+  })) as any;
+
   return (
     <SidebarProvider
       style={
@@ -34,19 +53,19 @@ export default async function LotteryAdminPage() {
           <div className="@container/main flex flex-1 flex-col gap-2">
             <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
               {/* Statistics Cards */}
-              <LotteryStatsCards stats={stats} />
+              <LotteryStatsCards stats={serializedStats} />
 
               {/* Lottery Draw Panel */}
               <LotteryDrawPanel
-                initialStatus={stats.status}
-                initialWinners={winners}
-                totalRegistrants={stats.totalRegistrants}
-                defaultWinnerCount={stats.maxTicketsAvailable}
-                drawnAt={stats.drawnAt}
+                initialStatus={serializedStats.status}
+                initialWinners={serializedWinners}
+                totalRegistrants={serializedStats.totalRegistrants}
+                defaultWinnerCount={serializedStats.maxTicketsAvailable}
+                drawnAt={serializedStats.drawnAt}
               />
 
               {/* All Registrants Table */}
-              <RegistrantsDataTable registrants={registrants} />
+              <RegistrantsDataTable registrants={serializedRegistrants} />
             </div>
           </div>
         </div>

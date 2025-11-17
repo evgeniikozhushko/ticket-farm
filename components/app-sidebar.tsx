@@ -36,8 +36,8 @@ import {
 
 const data = {
   user: {
-    name: "shadcn",
-    email: "m@example.com",
+    name: "Ticket Farm",
+    email: "hello@ticketfarm.com",
     avatar: "/avatars/shadcn.jpg",
   },
   navMain: [
@@ -47,7 +47,7 @@ const data = {
       icon: IconDashboard,
     },
     {
-      title: "Lottery Admin",
+      title: "Admin",
       url: "/dashboard/lottery",
       icon: IconTicket,
     },
