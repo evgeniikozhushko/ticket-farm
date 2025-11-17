@@ -16,6 +16,8 @@ export interface Lottery {
   dailyTheme: string;
   status: LotteryStatus;
   maxTicketsAvailable: number;
+  winnerRegistrantIds?: ObjectId[]; // IDs of selected winners
+  drawnAt?: Date; // Timestamp when lottery was drawn
   // Extend later as needed, e.g. timeSlots, notes, etc.
 }
 
@@ -32,3 +34,34 @@ export interface Ticket {
   status: TicketStatus;
   generatedAt: Date;
 }
+
+// Lottery Drawing Types
+export interface WinnerInfo {
+  _id: ObjectId;
+  name: string;
+  email: string;
+  enteredAt: Date;
+  ticketNumber?: number; // Sequential ticket number (1, 2, 3...)
+  ticketId?: string; // Unique 6-digit ticket ID
+}
+
+export interface LotteryStats {
+  totalRegistrants: number;
+  status: LotteryStatus;
+  winnersDrawn: number;
+  lotteryDate: string;
+  drawnAt?: Date;
+  maxTicketsAvailable: number;
+}
+
+export type DrawLotteryResult =
+  | {
+      success: true;
+      winners: WinnerInfo[];
+      winnerCount: number;
+      drawnAt: Date;
+    }
+  | {
+      success: false;
+      error: string;
+    };
