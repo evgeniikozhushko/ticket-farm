@@ -3,7 +3,8 @@
 import { ObjectId } from "mongodb";
 import { getRegistrantsCollection, getLotteriesCollection, getTicketsCollection } from "@/lib/mongodb";
 import { getTodayDateString } from "@/lib/date";
-import type { DrawLotteryResult, WinnerInfo, Registrant, Ticket } from "@/lib/types";
+import type { DrawLotteryResult, WinnerInfo, Ticket } from "@/lib/types";
+import { sendBulkWinnerEmails, type EmailTicket } from "@/lib/email";
 
 /**
  * Fisher-Yates shuffle algorithm for random array shuffling
@@ -102,6 +103,40 @@ export async function drawTodayLottery(
 
     // Insert all tickets at once
     await ticketsCollection.insertMany(ticketDocuments);
+
+    // Send winner notification emails
+    const emailTickets: EmailTicket[] = ticketDocuments.map((ticket) => ({
+      name: ticket.name,
+      email: ticket.email,
+      ticketNumber: ticket.ticketNumber,
+      ticketId: ticket.ticketId,
+      date: ticket.date,
+      pickupTime: ticket.pickupTime,
+    }));
+
+    // Send emails in parallel (don't block lottery draw on email failures)
+    const emailResults = await sendBulkWinnerEmails(emailTickets);
+
+    // Update tickets with email status
+    const emailUpdates = emailResults.map((result) => ({
+      updateOne: {
+        filter: {
+          date,
+          email: result.email,
+        },
+        update: {
+          $set: {
+            emailSent: result.success,
+            emailSentAt: result.success ? drawnAt : undefined,
+            emailError: result.error,
+          },
+        },
+      },
+    }));
+
+    if (emailUpdates.length > 0) {
+      await ticketsCollection.bulkWrite(emailUpdates);
+    }
 
     // Prepare winner info with ticket data
     const winners: WinnerInfo[] = selectedWinners.map((r, index) => ({

@@ -89,7 +89,7 @@ export function RegistrantsDataTable({ registrants }: RegistrantsDataTableProps)
       <CardHeader>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <CardTitle>All Registrants</CardTitle>
+            <CardTitle>Today's Registrants</CardTitle>
             <CardDescription>
               {filteredRegistrants.length} {filteredRegistrants.length === 1 ? "registrant" : "registrants"}
               {searchQuery && ` matching "${searchQuery}"`}

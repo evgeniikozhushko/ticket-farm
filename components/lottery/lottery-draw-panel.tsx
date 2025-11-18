@@ -7,10 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { IconTrophy, IconLoader } from "@tabler/icons-react";
+import { IconTrophy, IconLoader, IconMail, IconMailOff } from "@tabler/icons-react";
 import { toast } from "sonner";
 import { drawTodayLottery } from "@/lib/actions/lottery-draw.actions";
 import type { WinnerInfo, LotteryStatus } from "@/lib/types";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface LotteryDrawPanelProps {
   initialStatus: LotteryStatus;
@@ -55,7 +56,24 @@ export function LotteryDrawPanel({
         setStatus("LOTTERY_DRAWN");
         setWinners(result.winners);
         setLastDrawnAt(result.drawnAt);
+
+        // Show success message with email status
+        const emailsSent = result.winners.filter(w => w.emailSent).length;
+        const emailsFailed = result.winners.filter(w => w.emailSent === false).length;
+
         toast.success(`Successfully drew ${result.winnerCount} winners!`);
+
+        if (emailsSent > 0) {
+          toast.success(`Emails sent to ${emailsSent} winner${emailsSent !== 1 ? 's' : ''}`, {
+            icon: "📧",
+          });
+        }
+
+        if (emailsFailed > 0) {
+          toast.error(`Failed to send ${emailsFailed} email${emailsFailed !== 1 ? 's' : ''}`, {
+            description: "Winners were selected but some emails could not be sent",
+          });
+        }
       } else {
         toast.error(result.error);
       }
@@ -160,6 +178,44 @@ export function LotteryDrawPanel({
               </p>
             </div>
 
+            {(() => {
+              const emailsSent = winners.filter(w => w.emailSent).length;
+              const emailsFailed = winners.filter(w => w.emailSent === false).length;
+              const emailsPending = winners.filter(w => w.emailSent === undefined).length;
+
+              return (
+                <>
+                  {emailsSent > 0 && (
+                    <Alert className="border-green-500/50 bg-green-50 dark:bg-green-950/20">
+                      <IconMail className="size-4 text-green-600 dark:text-green-400" />
+                      <AlertDescription className="text-green-800 dark:text-green-200">
+                        Emails successfully sent to {emailsSent} winner{emailsSent !== 1 ? 's' : ''}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {emailsFailed > 0 && (
+                    <Alert className="border-red-500/50 bg-red-50 dark:bg-red-950/20">
+                      <IconMailOff className="size-4 text-red-600 dark:text-red-400" />
+                      <AlertDescription className="text-red-800 dark:text-red-200">
+                        Failed to send emails to {emailsFailed} winner{emailsFailed !== 1 ? 's' : ''}.
+                        Winners were selected successfully but email delivery failed.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {emailsPending > 0 && emailsSent === 0 && emailsFailed === 0 && (
+                    <Alert>
+                      <IconMail className="size-4" />
+                      <AlertDescription>
+                        Email status not yet available for {emailsPending} winner{emailsPending !== 1 ? 's' : ''}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </>
+              );
+            })()}
+
             {winners.length > 0 && (
               <div className="overflow-hidden rounded-lg border">
                 <Table>
@@ -170,6 +226,7 @@ export function LotteryDrawPanel({
                       <TableHead>Email</TableHead>
                       <TableHead>Ticket #</TableHead>
                       <TableHead>Ticket ID</TableHead>
+                      <TableHead className="w-24 text-center">Email Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -185,6 +242,21 @@ export function LotteryDrawPanel({
                         </TableCell>
                         <TableCell className="font-mono text-sm text-muted-foreground">
                           {winner.ticketId || "—"}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {winner.emailSent === true ? (
+                            <IconMail
+                              className="inline-block size-4 text-green-600 dark:text-green-400"
+                              title="Email sent successfully"
+                            />
+                          ) : winner.emailSent === false ? (
+                            <IconMailOff
+                              className="inline-block size-4 text-red-600 dark:text-red-400"
+                              title={winner.emailError || "Email failed to send"}
+                            />
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}

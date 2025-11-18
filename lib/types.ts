@@ -33,6 +33,10 @@ export interface Ticket {
   pickupTime: string; // e.g., "15:30" or ISO string
   status: TicketStatus;
   generatedAt: Date;
+  // Email tracking fields
+  emailSent?: boolean; // Whether the winner email was sent
+  emailSentAt?: Date; // Timestamp when email was sent
+  emailError?: string; // Error message if email failed
 }
 
 // Lottery Drawing Types
@@ -43,6 +47,8 @@ export interface WinnerInfo {
   enteredAt: Date;
   ticketNumber?: number; // Sequential ticket number (1, 2, 3...)
   ticketId?: string; // Unique 6-digit ticket ID
+  emailSent?: boolean; // Whether the winner email was sent
+  emailError?: string; // Error message if email failed
 }
 
 export interface LotteryStats {
