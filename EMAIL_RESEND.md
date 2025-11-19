@@ -570,6 +570,87 @@ File: .env.example (template for others)
 # Resend API Key for sending winner notification emails
 # Get your API key from: https://resend.com/api-keys
 RESEND_API_KEY=re_your_api_key_here
+
+## 🚨 IMPORTANT: Test Mode Email Restrictions
+
+### Current Setup: Development/Test Mode
+
+The application is currently configured to use `onboarding@resend.dev` as the sender email address. This is Resend's shared test domain and has important limitations:
+
+**Restriction**: Emails sent from `onboarding@resend.dev` can **ONLY** be delivered to verified email addresses.
+
+### How to Verify Test Email Addresses
+
+To receive emails during development/testing:
+
+1. Go to your Resend dashboard: https://resend.com/emails
+2. Navigate to "Emails" > "Verified Emails" (or use: https://resend.com/domains)
+3. Click "Add Email" or "Verify Email Address"
+4. Enter the test email address you want to use
+5. Resend will send a verification email - click the link to verify
+6. Once verified, emails from `onboarding@resend.dev` will be delivered to that address
+
+**Example**: If you're testing with `john@example.com`, you must first verify `john@example.com` in your Resend dashboard.
+
+### Why Emails Fail in Test Mode
+
+When you see "Failed to send emails" errors, it's typically because:
+- ❌ The recipient email hasn't been verified in Resend dashboard
+- ❌ You're trying to send to a free public domain (Gmail, Yahoo, etc.) without verification
+- ❌ Rate limits exceeded on the test domain
+
+### Production Setup: Using Your Own Domain
+
+For production deployment, you need to:
+
+1. **Purchase/Own a Custom Domain**
+   - Example: `foodrecovery.com`, `lotteryapp.com`
+   - Cannot use free domains like `vercel.app`, `herokuapp.com`, etc.
+   - Resend policy: "We don't allow free public domains"
+
+2. **Add Domain to Resend**
+   - Go to https://resend.com/domains
+   - Click "Add Domain"
+   - Enter your domain (e.g., `foodrecovery.com`)
+
+3. **Configure DNS Records**
+   Resend will provide DNS records to add to your domain:
+   - **SPF** (Sender Policy Framework) - Prevents spoofing
+   - **DKIM** (DomainKeys Identified Mail) - Email authentication
+   - **DMARC** (Domain-based Message Authentication) - Email policy
+
+4. **Update Configuration**
+   Edit `lib/email.ts` line 39:
+   ```typescript
+   from: "noreply@yourdomain.com",  // Replace with your verified domain
+   ```
+
+5. **Add to Vercel Project** (if using custom domain)
+   - Go to your Vercel project settings
+   - Add your custom domain
+   - Configure DNS to point to Vercel
+
+### Quick Reference
+
+| Environment | Sender Email | Recipient Restriction | Use Case |
+|------------|--------------|----------------------|----------|
+| **Development** | `onboarding@resend.dev` | ✅ Verified emails only | Local testing |
+| **Staging** | `onboarding@resend.dev` | ✅ Verified emails only | Team testing |
+| **Production** | `noreply@yourdomain.com` | ❌ No restrictions | Public use |
+
+### Troubleshooting
+
+**Q: Why do I see "Failed to send emails to X winner(s)"?**
+A: You're using test mode (`onboarding@resend.dev`). Verify the recipient email addresses in your Resend dashboard.
+
+**Q: Can I use my Vercel domain (ticket-farm.vercel.app)?**
+A: No. Resend doesn't allow free public domains. You must use a custom domain you own.
+
+**Q: How do I check if an email was actually sent?**
+A: Check the Resend dashboard at https://resend.com/emails for delivery logs and status.
+
+**Q: What's the free tier limit?**
+A: Resend free tier: 3,000 emails/month, 100 emails/day. Check https://resend.com/pricing for current limits.
 🔄 Complete Flow Diagram
 1. Admin clicks "Run Lottery Draw"
    └─> drawTodayLottery() in lottery-draw.actions.ts

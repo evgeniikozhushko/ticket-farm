@@ -2,6 +2,8 @@ import { getRegistrantsCollection } from "@/lib/mongodb";
 import { getTodayDateString } from "@/lib/date";
 import type { Registrant } from "@/lib/types";
 
+export const dynamic = 'force-dynamic';
+
 async function getTodayRegistrants(): Promise<Registrant[]> {
   const collection = await getRegistrantsCollection();
   const date = getTodayDateString();

@@ -10,6 +10,8 @@ import {
   getTodayWinners,
 } from "@/lib/actions/lottery-query.actions";
 
+export const dynamic = 'force-dynamic';
+
 export default async function LotteryAdminPage() {
   // Fetch all data in parallel
   const [stats, registrants, winners] = await Promise.all([

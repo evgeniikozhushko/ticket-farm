@@ -200,6 +200,19 @@ export function LotteryDrawPanel({
                       <AlertDescription className="text-red-800 dark:text-red-200">
                         Failed to send emails to {emailsFailed} winner{emailsFailed !== 1 ? 's' : ''}.
                         Winners were selected successfully but email delivery failed.
+                        <br />
+                        <span className="text-sm mt-1 block">
+                          Using test mode (onboarding@resend.dev). Emails only send to verified addresses in your{" "}
+                          <a
+                            href="https://resend.com/emails"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline hover:text-red-900 dark:hover:text-red-100"
+                          >
+                            Resend dashboard
+                          </a>
+                          . See EMAIL_RESEND.md for details.
+                        </span>
                       </AlertDescription>
                     </Alert>
                   )}
