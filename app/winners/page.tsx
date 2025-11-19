@@ -3,6 +3,8 @@ import { getTicketsCollection } from "@/lib/mongodb"
 import { getTodayDateString } from "@/lib/date"
 import type { Ticket } from '@/lib/types'
 
+export const dynamic = 'force-dynamic';
+
 /**
  * Server-side function to fetch today's winning tickets from MongoDB.
  * Returns tickets with ACTIVE or CANCELED status, sorted by ticket number.
