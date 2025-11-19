@@ -28,7 +28,7 @@ export async function sendWinnerEmail(
 ): Promise<EmailResult> {
   try {
     const { data, error } = await resend.emails.send({
-      from: "onboarding@resend.dev",
+      from: "hello@ticketfarm.ca",
       to: [ticket.email],
       subject: `You Won! Ticket #${ticket.ticketNumber} - Canmore Food Recovery`,
       react: WinnerTicketEmail({

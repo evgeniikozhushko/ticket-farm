@@ -202,7 +202,7 @@ export function LotteryDrawPanel({
                         Winners were selected successfully but email delivery failed.
                         <br />
                         <span className="text-sm mt-1 block">
-                          Using test mode (onboarding@resend.dev). Emails only send to verified addresses in your{" "}
+                          Using (hello@ticketfarm.ca). Emails only send to verified addresses in your{" "}
                           <a
                             href="https://resend.com/emails"
                             target="_blank"

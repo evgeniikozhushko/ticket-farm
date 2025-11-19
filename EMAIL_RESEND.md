@@ -169,7 +169,7 @@ export async function sendWinnerEmail(
 ): Promise<EmailResult> {
   try {
     const { data, error } = await resend.emails.send({
-      from: "onboarding@resend.dev",  // Resend's shared domain for testing
+      from: "hello@ticketfarm.ca",  // Your verified custom domain
       to: [ticket.email],               // Recipient
       subject: `You Won! Ticket #${ticket.ticketNumber} - Canmore Food Recovery`,
       react: WinnerTicketEmail({        // React component (auto-rendered to HTML)
@@ -571,86 +571,92 @@ File: .env.example (template for others)
 # Get your API key from: https://resend.com/api-keys
 RESEND_API_KEY=re_your_api_key_here
 
-## 🚨 IMPORTANT: Test Mode Email Restrictions
+## 📧 IMPORTANT: Production Email Configuration
 
-### Current Setup: Development/Test Mode
+### Current Setup: Production Mode with Custom Domain
 
-The application is currently configured to use `onboarding@resend.dev` as the sender email address. This is Resend's shared test domain and has important limitations:
+The application is configured to use `hello@ticketfarm.ca` as the sender email address. This is a verified custom domain configured in Resend.
 
-**Restriction**: Emails sent from `onboarding@resend.dev` can **ONLY** be delivered to verified email addresses.
+**Status**: Production mode - emails can be sent to any recipient address once the domain is verified in Resend.
 
-### How to Verify Test Email Addresses
+### Domain Verification Setup (Required for Production)
 
-To receive emails during development/testing:
+To use `hello@ticketfarm.ca` in production, complete these steps in Resend:
 
-1. Go to your Resend dashboard: https://resend.com/emails
-2. Navigate to "Emails" > "Verified Emails" (or use: https://resend.com/domains)
-3. Click "Add Email" or "Verify Email Address"
-4. Enter the test email address you want to use
-5. Resend will send a verification email - click the link to verify
-6. Once verified, emails from `onboarding@resend.dev` will be delivered to that address
-
-**Example**: If you're testing with `john@example.com`, you must first verify `john@example.com` in your Resend dashboard.
-
-### Why Emails Fail in Test Mode
-
-When you see "Failed to send emails" errors, it's typically because:
-- ❌ The recipient email hasn't been verified in Resend dashboard
-- ❌ You're trying to send to a free public domain (Gmail, Yahoo, etc.) without verification
-- ❌ Rate limits exceeded on the test domain
-
-### Production Setup: Using Your Own Domain
-
-For production deployment, you need to:
-
-1. **Purchase/Own a Custom Domain**
-   - Example: `foodrecovery.com`, `lotteryapp.com`
-   - Cannot use free domains like `vercel.app`, `herokuapp.com`, etc.
-   - Resend policy: "We don't allow free public domains"
-
-2. **Add Domain to Resend**
+1. **Add Domain to Resend**
    - Go to https://resend.com/domains
    - Click "Add Domain"
-   - Enter your domain (e.g., `foodrecovery.com`)
+   - Enter: `ticketfarm.ca`
 
-3. **Configure DNS Records**
-   Resend will provide DNS records to add to your domain:
-   - **SPF** (Sender Policy Framework) - Prevents spoofing
-   - **DKIM** (DomainKeys Identified Mail) - Email authentication
-   - **DMARC** (Domain-based Message Authentication) - Email policy
+2. **Configure DNS Records**
+   Resend will provide DNS records to add to your domain registrar:
+   - **SPF Record** - Authorizes Resend to send emails on your behalf
+   - **DKIM Record** - Cryptographic signature for email authentication
+   - **DMARC Record** - Email policy and reporting
 
-4. **Update Configuration**
-   Edit `lib/email.ts` line 39:
-   ```typescript
-   from: "noreply@yourdomain.com",  // Replace with your verified domain
-   ```
+3. **Verify Domain**
+   - After adding DNS records, click "Verify" in Resend dashboard
+   - DNS propagation can take 24-48 hours
+   - Once verified, emails can be sent to ANY recipient address
 
-5. **Add to Vercel Project** (if using custom domain)
-   - Go to your Vercel project settings
-   - Add your custom domain
-   - Configure DNS to point to Vercel
+**Current Configuration**: `hello@ticketfarm.ca` (configured in `lib/email.ts` line 31)
+
+### Why Emails May Fail
+
+If you see "Failed to send emails" errors, it's typically because:
+- ❌ The domain `ticketfarm.ca` hasn't been verified in Resend dashboard yet
+- ❌ DNS records haven't propagated (can take up to 48 hours)
+- ❌ Rate limits exceeded (free tier: 100 emails/day, 3,000/month)
+- ❌ Invalid recipient email addresses
+
+### Test Mode Setup (For Testing Only)
+
+If you need to test with Resend's test domain before your custom domain is verified:
+
+1. **Use Test Sender**
+   - Temporarily change `lib/email.ts` line 31 to: `from: "onboarding@resend.dev"`
+   - This is Resend's shared test domain
+
+2. **Verify Recipient Emails**
+   - Go to https://resend.com/emails
+   - Add and verify each test email address
+   - Emails will only send to verified addresses in test mode
+
+3. **Switch Back to Production**
+   - Once `ticketfarm.ca` is verified, change back to: `from: "hello@ticketfarm.ca"`
+
+**Note**: Test mode has restrictions - emails only send to verified addresses. Production mode (with verified custom domain) has no such restrictions.
 
 ### Quick Reference
 
 | Environment | Sender Email | Recipient Restriction | Use Case |
 |------------|--------------|----------------------|----------|
-| **Development** | `onboarding@resend.dev` | ✅ Verified emails only | Local testing |
-| **Staging** | `onboarding@resend.dev` | ✅ Verified emails only | Team testing |
-| **Production** | `noreply@yourdomain.com` | ❌ No restrictions | Public use |
+| **Test Mode** | `onboarding@resend.dev` | ✅ Verified emails only | Testing before domain verification |
+| **Production** | `hello@ticketfarm.ca` | ❌ No restrictions (once verified) | Live application |
 
 ### Troubleshooting
 
 **Q: Why do I see "Failed to send emails to X winner(s)"?**
-A: You're using test mode (`onboarding@resend.dev`). Verify the recipient email addresses in your Resend dashboard.
+A: The most common reasons are:
+- Domain `ticketfarm.ca` hasn't been verified in Resend dashboard yet
+- DNS records haven't fully propagated (can take up to 48 hours)
+- Rate limits exceeded (100 emails/day on free tier)
+- Check the Resend dashboard at https://resend.com/emails for specific error messages
 
-**Q: Can I use my Vercel domain (ticket-farm.vercel.app)?**
-A: No. Resend doesn't allow free public domains. You must use a custom domain you own.
+**Q: How do I verify my domain in Resend?**
+A: Go to https://resend.com/domains, add `ticketfarm.ca`, and configure the provided DNS records with your domain registrar.
+
+**Q: Can I use my Vercel domain (ticket-farm.vercel.app) for emails?**
+A: No. Resend doesn't allow free public domains. You must use a custom domain you own (like `ticketfarm.ca`).
 
 **Q: How do I check if an email was actually sent?**
 A: Check the Resend dashboard at https://resend.com/emails for delivery logs and status.
 
 **Q: What's the free tier limit?**
 A: Resend free tier: 3,000 emails/month, 100 emails/day. Check https://resend.com/pricing for current limits.
+
+**Q: The app shows `hello@ticketfarm.ca` but I want to use test mode**
+A: Temporarily change line 31 in `lib/email.ts` to `from: "onboarding@resend.dev"` for testing, then change it back once your domain is verified.
 🔄 Complete Flow Diagram
 1. Admin clicks "Run Lottery Draw"
    └─> drawTodayLottery() in lottery-draw.actions.ts
@@ -666,7 +672,7 @@ A: Resend free tier: 3,000 emails/month, 100 emails/day. Check https://resend.co
        └─> For each ticket:
            └─> sendWinnerEmail(ticket)
                └─> resend.emails.send({
-                   from: "onboarding@resend.dev",
+                   from: "hello@ticketfarm.ca",
                    to: ticket.email,
                    react: WinnerTicketEmail(props)  // Auto-rendered to HTML
                })

@@ -37,7 +37,7 @@ import {
 const data = {
   user: {
     name: "Ticket Farm",
-    email: "hello@ticketfarm.com",
+    email: "hello@ticketfarm.ca",
     avatar: "/avatars/shadcn.jpg",
   },
   navMain: [
