@@ -17,7 +17,7 @@ import { setupIndexes, listIndexes } from '../lib/setup-indexes';
 
 async function main() {
   console.log("╔════════════════════════════════════════════════╗");
-  console.log("║    Tickety Database Setup Script              ║");
+  console.log("║    Ticket Farm Database Setup Script              ║");
   console.log("╚════════════════════════════════════════════════╝\n");
 
   try {

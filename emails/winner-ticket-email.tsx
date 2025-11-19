@@ -28,13 +28,13 @@ export default function WinnerTicketEmail({
   return (
     <Html>
       <Head />
-      <Preview>Congratulations! You won the Canmore Food Recovery lottery!</Preview>
+      <Preview>Success! Your Canmore Food Recovery ticket is confirmed.</Preview>
       <Body style={main}>
         <Container style={container}>
           <Heading style={h1}>Congratulations, {name}!</Heading>
 
           <Text style={text}>
-            You've been selected as a winner in today's Canmore Food Recovery lottery!
+            Your Canmore Food Recovery ticket has been confirmed for today.
           </Text>
 
           <Section style={ticketSection}>
@@ -61,7 +61,7 @@ export default function WinnerTicketEmail({
               Please bring this email or your Ticket ID (<strong>{ticketId}</strong>) when you come to pick up your food.
             </Text>
             <Text style={text}>
-              <strong>Pickup Location:</strong> Canmore Food Recovery Center
+              <strong>Pickup Location:</strong> Shepherd of the Valley Lutheran Church (near Hospital), 1205 1 Ave, Canmore, AB T1W 1M5
             </Text>
             <Text style={text}>
               <strong>Pickup Time:</strong> {pickupTime}

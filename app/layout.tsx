@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Welcome to Tickety!",
-  description: "Tickety provides fast and convenient ticket systems.",
+  title: "Welcome to Ticket Farm!",
+  description: "Ticket Farm provides fast and convenient ticket systems.",
 };
 
 export default function RootLayout({

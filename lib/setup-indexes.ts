@@ -1,7 +1,7 @@
 import { getDb } from './mongodb';
 
 /**
- * Creates all necessary indexes for the Tickety application.
+ * Creates all necessary indexes for the Ticket Farm application.
  * Run this once during initial setup or deployment.
  *
  * Indexes improve query performance by allowing MongoDB to quickly
