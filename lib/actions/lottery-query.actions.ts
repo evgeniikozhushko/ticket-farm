@@ -114,14 +114,14 @@ export async function getTodayWinners(): Promise<WinnerInfo[]> {
       tickets.map((t) => [t.email, t])
     );
 
-    // Map to WinnerInfo type with ticket data
+    // Map to WinnerInfo type with ticket data (serialized for Client Components)
     return winners.map((w) => {
       const ticket = ticketMap.get(w.email);
       return {
-        _id: w._id as ObjectId,
+        _id: (w._id as ObjectId).toString(), // Serialize ObjectId to string
         name: w.name,
         email: w.email,
-        enteredAt: w.enteredAt,
+        enteredAt: w.enteredAt.toISOString(), // Serialize Date to ISO string
         ticketNumber: ticket?.ticketNumber,
         ticketId: ticket?.ticketId,
         emailSent: ticket?.emailSent,

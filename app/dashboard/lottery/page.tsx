@@ -31,11 +31,8 @@ export default async function LotteryAdminPage() {
     enteredAt: r.enteredAt.toISOString(),
   })) as any;
 
-  const serializedWinners = winners.map((w) => ({
-    ...w,
-    _id: w._id.toString(),
-    enteredAt: w.enteredAt.toISOString(),
-  })) as any;
+  // Winners are already serialized by getTodayWinners()
+  const serializedWinners = winners;
 
   return (
     <SidebarProvider

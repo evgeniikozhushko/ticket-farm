@@ -138,15 +138,20 @@ export async function drawTodayLottery(
       await ticketsCollection.bulkWrite(emailUpdates);
     }
 
-    // Prepare winner info with ticket data
-    const winners: WinnerInfo[] = selectedWinners.map((r, index) => ({
-      _id: r._id as ObjectId,
-      name: r.name,
-      email: r.email,
-      enteredAt: r.enteredAt,
-      ticketNumber: ticketDocuments[index].ticketNumber,
-      ticketId: ticketDocuments[index].ticketId,
-    }));
+    // Prepare winner info with ticket data and email status (serialized for Client Components)
+    const winners: WinnerInfo[] = selectedWinners.map((r, index) => {
+      const emailResult = emailResults.find((result) => result.email === r.email);
+      return {
+        _id: (r._id as ObjectId).toString(), // Serialize ObjectId to string
+        name: r.name,
+        email: r.email,
+        enteredAt: r.enteredAt.toISOString(), // Serialize Date to ISO string
+        ticketNumber: ticketDocuments[index].ticketNumber,
+        ticketId: ticketDocuments[index].ticketId,
+        emailSent: emailResult?.success,
+        emailError: emailResult?.error,
+      };
+    });
 
     // Upsert lottery document
     await lotteriesCollection.updateOne(
@@ -170,7 +175,7 @@ export async function drawTodayLottery(
       success: true,
       winners,
       winnerCount,
-      drawnAt,
+      drawnAt: drawnAt.toISOString(), // Serialize Date to ISO string
     };
   } catch (err) {
     console.error("drawTodayLottery error:", err);

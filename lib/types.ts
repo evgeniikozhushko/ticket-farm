@@ -41,10 +41,10 @@ export interface Ticket {
 
 // Lottery Drawing Types
 export interface WinnerInfo {
-  _id: ObjectId;
+  _id: string; // Serialized ObjectId as string for Client Components
   name: string;
   email: string;
-  enteredAt: Date;
+  enteredAt: string; // Serialized Date as ISO string for Client Components
   ticketNumber?: number; // Sequential ticket number (1, 2, 3...)
   ticketId?: string; // Unique 6-digit ticket ID
   emailSent?: boolean; // Whether the winner email was sent
@@ -65,7 +65,7 @@ export type DrawLotteryResult =
       success: true;
       winners: WinnerInfo[];
       winnerCount: number;
-      drawnAt: Date;
+      drawnAt: string; // Serialized Date as ISO string for Client Components
     }
   | {
       success: false;

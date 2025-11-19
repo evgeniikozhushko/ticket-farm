@@ -18,7 +18,7 @@ interface LotteryDrawPanelProps {
   initialWinners: WinnerInfo[];
   totalRegistrants: number;
   defaultWinnerCount: number;
-  drawnAt?: Date;
+  drawnAt?: string; // Serialized Date as ISO string
 }
 
 export function LotteryDrawPanel({
@@ -34,7 +34,7 @@ export function LotteryDrawPanel({
     defaultWinnerCount > 0 ? defaultWinnerCount : Math.min(10, totalRegistrants)
   );
   const [isLoading, setIsLoading] = useState(false);
-  const [lastDrawnAt, setLastDrawnAt] = useState<Date | undefined>(drawnAt);
+  const [lastDrawnAt, setLastDrawnAt] = useState<string | undefined>(drawnAt);
 
   const handleDraw = async () => {
     if (winnerCount <= 0) {
@@ -231,7 +231,7 @@ export function LotteryDrawPanel({
                   </TableHeader>
                   <TableBody>
                     {winners.map((winner, index) => (
-                      <TableRow key={winner._id.toString()}>
+                      <TableRow key={winner._id}>
                         <TableCell className="font-medium">{index + 1}</TableCell>
                         <TableCell>{winner.name}</TableCell>
                         <TableCell className="text-muted-foreground">{winner.email}</TableCell>
