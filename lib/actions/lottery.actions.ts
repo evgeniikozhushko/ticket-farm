@@ -43,16 +43,6 @@ export async function enterLottery(formData: FormData): Promise<EnterLotteryResu
     const date = getTodayDateString();
     const collection = await getRegistrantsCollection();
 
-    // Check if already registered today
-    const existing = await collection.findOne({ email, date });
-
-    if (existing) {
-      return {
-        success: false,
-        error: "You’ve already entered today’s lottery. Please check back tomorrow.",
-      };
-    }
-
     const newRegistrant: Omit<Registrant, "_id"> = {
       name,
       email,
@@ -64,6 +54,18 @@ export async function enterLottery(formData: FormData): Promise<EnterLotteryResu
 
     return { success: true };
   } catch (err) {
+    // MongoDB duplicate key error (E11000) — already registered today
+    if (
+      typeof err === "object" &&
+      err !== null &&
+      "code" in err &&
+      (err as { code: number }).code === 11000
+    ) {
+      return {
+        success: false,
+        error: "You've already entered today's lottery. Please check back tomorrow.",
+      };
+    }
     console.error("enterLottery error:", err);
     return {
       success: false,

@@ -49,17 +49,6 @@ export async function drawTodayLottery(
     const lotteriesCollection = await getLotteriesCollection();
     const registrantsCollection = await getRegistrantsCollection();
 
-    // Check if lottery already drawn
-    const existingLottery = await lotteriesCollection.findOne({ date });
-
-    if (existingLottery && existingLottery.status === "LOTTERY_DRAWN") {
-      return {
-        success: false,
-        error:
-          "Lottery already drawn for today. You must reset or override to re-draw.",
-      };
-    }
-
     // Fetch today's registrants
     const registrants = await registrantsCollection
       .find({ date })
@@ -83,25 +72,60 @@ export async function drawTodayLottery(
     // Random selection: Shuffle and take first N
     const shuffled = shuffleArray(registrants);
     const selectedWinners = shuffled.slice(0, winnerCount);
-
-    // Extract winner IDs
     const winnerIds = selectedWinners.map((r) => r._id as ObjectId);
     const drawnAt = new Date();
 
-    // Generate tickets for all winners
+    // Atomically acquire the draw lock by transitioning the lottery document
+    // to LOTTERY_DRAWN status. The filter { status: { $ne: "LOTTERY_DRAWN" } }
+    // ensures only one concurrent request can succeed. If the lottery is already
+    // drawn, the filter will not match; with upsert:true MongoDB attempts to
+    // insert a new document, which is blocked by the unique { date } index
+    // (E11000). We catch that to detect the race condition.
+    try {
+      await lotteriesCollection.updateOne(
+        { date, status: { $ne: "LOTTERY_DRAWN" } },
+        {
+          $set: {
+            status: "LOTTERY_DRAWN",
+            winnerRegistrantIds: winnerIds,
+            drawnAt,
+          },
+          $setOnInsert: {
+            date,
+            dailyTheme: "",
+            maxTicketsAvailable: winnerCount,
+          },
+        },
+        { upsert: true }
+      );
+    } catch (lockErr) {
+      if (
+        typeof lockErr === "object" &&
+        lockErr !== null &&
+        "code" in lockErr &&
+        (lockErr as { code: number }).code === 11000
+      ) {
+        return {
+          success: false,
+          error: "Lottery already drawn for today. You must reset or override to re-draw.",
+        };
+      }
+      throw lockErr;
+    }
+
+    // Lock acquired — generate and insert tickets
     const ticketsCollection = await getTicketsCollection();
     const ticketDocuments: Omit<Ticket, "_id">[] = selectedWinners.map((winner, index) => ({
-      ticketNumber: index + 1, // Sequential: 1, 2, 3...
-      ticketId: generateTicketId(), // Random 6-digit code
+      ticketNumber: index + 1,
+      ticketId: generateTicketId(),
       name: winner.name,
       email: winner.email,
-      date: date,
-      pickupTime: "5:30 PM", // Default pickup time
+      date,
+      pickupTime: "5:30 PM",
       status: "ACTIVE",
       generatedAt: drawnAt,
     }));
 
-    // Insert all tickets at once
     await ticketsCollection.insertMany(ticketDocuments);
 
     // Send winner notification emails
@@ -114,10 +138,9 @@ export async function drawTodayLottery(
       pickupTime: ticket.pickupTime,
     }));
 
-    // Send emails in parallel (don't block lottery draw on email failures)
     const emailResults = await sendBulkWinnerEmails(emailTickets);
 
-    // Update tickets with email status
+    // Update tickets with email delivery status
     const emailUpdates = emailResults.map((result) => ({
       updateOne: {
         filter: {
@@ -138,38 +161,20 @@ export async function drawTodayLottery(
       await ticketsCollection.bulkWrite(emailUpdates);
     }
 
-    // Prepare winner info with ticket data and email status (serialized for Client Components)
+    // Prepare winner info for client (serialize ObjectId and Date)
     const winners: WinnerInfo[] = selectedWinners.map((r, index) => {
       const emailResult = emailResults.find((result) => result.email === r.email);
       return {
-        _id: (r._id as ObjectId).toString(), // Serialize ObjectId to string
+        _id: (r._id as ObjectId).toString(),
         name: r.name,
         email: r.email,
-        enteredAt: r.enteredAt.toISOString(), // Serialize Date to ISO string
+        enteredAt: r.enteredAt.toISOString(),
         ticketNumber: ticketDocuments[index].ticketNumber,
         ticketId: ticketDocuments[index].ticketId,
         emailSent: emailResult?.success,
         emailError: emailResult?.error,
       };
     });
-
-    // Upsert lottery document
-    await lotteriesCollection.updateOne(
-      { date },
-      {
-        $set: {
-          status: "LOTTERY_DRAWN",
-          winnerRegistrantIds: winnerIds,
-          drawnAt: drawnAt,
-        },
-        $setOnInsert: {
-          date,
-          dailyTheme: "", // Can be set separately by admin
-          maxTicketsAvailable: winnerCount,
-        },
-      },
-      { upsert: true }
-    );
 
     return {
       success: true,

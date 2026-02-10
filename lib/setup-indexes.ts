@@ -18,13 +18,13 @@ export async function setupIndexes() {
 
   console.log("  📋 Creating indexes for 'registrants' collection...");
 
-  // Index for duplicate checking (used in lottery.actions.ts)
-  // Query: collection.findOne({ email, date })
+  // Unique index for duplicate checking — prevents concurrent duplicate registrations
+  // Query: collection.insertOne({ email, date }) — E11000 on duplicate
   await db.collection('registrants').createIndex(
     { email: 1, date: 1 },
-    { name: 'email_date_idx' }
+    { unique: true, name: 'email_date_unique_idx' }
   );
-  console.log("    ✅ Created: { email: 1, date: 1 }");
+  console.log("    ✅ Created: { email: 1, date: 1 } (unique)");
 
   // Index for admin page queries (used in app/admin/registrants/page.tsx)
   // Query: collection.find({ date }).sort({ enteredAt: 1 })
