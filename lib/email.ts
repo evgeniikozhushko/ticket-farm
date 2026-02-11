@@ -1,7 +1,6 @@
 import { Resend } from "resend";
 import WinnerTicketEmail from "@/emails/winner-ticket-email";
 
-// Initialize Resend client
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export interface EmailTicket {
@@ -11,6 +10,11 @@ export interface EmailTicket {
   ticketId: string;
   date: string;
   pickupTime: string;
+  // Org branding
+  orgName: string;
+  pickupLocation?: string;
+  emailFromAddress: string;
+  emailFromName: string;
 }
 
 export interface EmailResult {
@@ -20,87 +24,52 @@ export interface EmailResult {
   messageId?: string;
 }
 
-/**
- * Send winner notification email to a single recipient
- */
-export async function sendWinnerEmail(
-  ticket: EmailTicket
-): Promise<EmailResult> {
+export async function sendWinnerEmail(ticket: EmailTicket): Promise<EmailResult> {
   try {
     const { data, error } = await resend.emails.send({
-      from: "hello@ticketfarm.ca",
+      from: `${ticket.emailFromName} <${ticket.emailFromAddress}>`,
       to: [ticket.email],
-      subject: `Congrats! Your ticket #${ticket.ticketNumber} - Canmore Food Recovery`,
+      subject: `Congrats! Your ticket #${ticket.ticketNumber} - ${ticket.orgName}`,
       react: WinnerTicketEmail({
         name: ticket.name,
         ticketNumber: ticket.ticketNumber,
         ticketId: ticket.ticketId,
         date: ticket.date,
         pickupTime: ticket.pickupTime,
+        orgName: ticket.orgName,
+        pickupLocation: ticket.pickupLocation,
       }),
     });
 
     if (error) {
       console.error(`Failed to send email to ${ticket.email}:`, error);
-      return {
-        success: false,
-        email: ticket.email,
-        error: error.message,
-      };
+      return { success: false, email: ticket.email, error: error.message };
     }
 
-    console.log(`Email sent successfully to ${ticket.email}, ID: ${data?.id}`);
-    return {
-      success: true,
-      email: ticket.email,
-      messageId: data?.id,
-    };
-  } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
-    console.error(`Exception sending email to ${ticket.email}:`, errorMessage);
-    return {
-      success: false,
-      email: ticket.email,
-      error: errorMessage,
-    };
+    return { success: true, email: ticket.email, messageId: data?.id };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    console.error(`Exception sending email to ${ticket.email}:`, message);
+    return { success: false, email: ticket.email, error: message };
   }
 }
 
-/**
- * Send winner notification emails to multiple recipients
- * Returns array of results for each email
- */
-export async function sendBulkWinnerEmails(
-  tickets: EmailTicket[]
-): Promise<EmailResult[]> {
+export async function sendBulkWinnerEmails(tickets: EmailTicket[]): Promise<EmailResult[]> {
   console.log(`Sending emails to ${tickets.length} winners...`);
 
-  // Send all emails in parallel
-  const emailPromises = tickets.map((ticket) => sendWinnerEmail(ticket));
-  const results = await Promise.allSettled(emailPromises);
+  const results = await Promise.allSettled(tickets.map(sendWinnerEmail));
 
-  // Process results
   const emailResults: EmailResult[] = results.map((result, index) => {
-    if (result.status === "fulfilled") {
-      return result.value;
-    } else {
-      // Handle rejected promise
-      return {
-        success: false,
-        email: tickets[index].email,
-        error: result.reason?.message || "Promise rejected",
-      };
-    }
+    if (result.status === "fulfilled") return result.value;
+    return {
+      success: false,
+      email: tickets[index].email,
+      error: result.reason?.message || "Promise rejected",
+    };
   });
 
-  // Log summary
   const successCount = emailResults.filter((r) => r.success).length;
-  const failureCount = emailResults.length - successCount;
-
-  console.log(
-    `Email sending complete: ${successCount} successful, ${failureCount} failed`
-  );
+  console.log(`Email sending complete: ${successCount}/${emailResults.length} successful`);
 
   return emailResults;
 }

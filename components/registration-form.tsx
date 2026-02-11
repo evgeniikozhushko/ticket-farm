@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { enterLottery } from '@/lib/actions/lottery.actions'
 
-export function RegistrationForm() {
+export function RegistrationForm({ orgSlug }: { orgSlug: string }) {
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [consent, setConsent] = useState(false)
@@ -23,7 +23,7 @@ export function RegistrationForm() {
     setIsLoading(true)
   
     const formData = new FormData(e.target as HTMLFormElement)
-    const result = await enterLottery(formData)
+    const result = await enterLottery(orgSlug, formData)
     
     if (result.success) {
       setIsSubmitted(true)

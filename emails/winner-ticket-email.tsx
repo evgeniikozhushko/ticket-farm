@@ -16,6 +16,8 @@ interface WinnerTicketEmailProps {
   ticketId: string;
   date: string;
   pickupTime: string;
+  orgName: string;
+  pickupLocation?: string;
 }
 
 export default function WinnerTicketEmail({
@@ -24,17 +26,19 @@ export default function WinnerTicketEmail({
   ticketId = "123456",
   date = "2024-01-01",
   pickupTime = "5:30 PM",
+  orgName = "Ticket Farm",
+  pickupLocation,
 }: WinnerTicketEmailProps) {
   return (
     <Html>
       <Head />
-      <Preview>Success! Your Canmore Food Recovery ticket is confirmed.</Preview>
+      <Preview>Success! Your {orgName} ticket is confirmed.</Preview>
       <Body style={main}>
         <Container style={container}>
           <Heading style={h1}>Congratulations, {name}!</Heading>
 
           <Text style={text}>
-            Your Canmore Food Recovery ticket has been confirmed for today.
+            Your {orgName} ticket has been confirmed for today.
           </Text>
 
           <Section style={ticketSection}>
@@ -58,11 +62,13 @@ export default function WinnerTicketEmail({
           <Section style={instructionsSection}>
             <Heading as="h3" style={h3}>Next Steps</Heading>
             <Text style={text}>
-              Please bring this email or your Ticket ID (<strong>{ticketId}</strong>) when you come to pick up your food.
+              Please bring this email or your Ticket ID (<strong>{ticketId}</strong>) when you come to pick up.
             </Text>
-            <Text style={text}>
-              <strong>Pickup Location:</strong> Shepherd of the Valley Lutheran Church (near Hospital), 1205 1 Ave, Canmore, AB T1W 1M5
-            </Text>
+            {pickupLocation && (
+              <Text style={text}>
+                <strong>Pickup Location:</strong> {pickupLocation}
+              </Text>
+            )}
             <Text style={text}>
               <strong>Pickup Time:</strong> {pickupTime}
             </Text>
@@ -74,7 +80,7 @@ export default function WinnerTicketEmail({
           <Hr style={hr} />
 
           <Text style={footer}>
-            Thank you for supporting Canmore Food Recovery!
+            Thank you for participating in {orgName}!
           </Text>
         </Container>
       </Body>
@@ -82,11 +88,9 @@ export default function WinnerTicketEmail({
   );
 }
 
-// Styles
 const main = {
   backgroundColor: "#f6f9fc",
-  fontFamily:
-    '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Ubuntu,sans-serif',
+  fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Ubuntu,sans-serif',
 };
 
 const container = {

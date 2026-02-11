@@ -1,89 +1,128 @@
 import { getDb } from './mongodb';
 
 /**
- * Creates all necessary indexes for the Ticket Farm application.
- * Run this once during initial setup or deployment.
+ * Creates all indexes for Ticket Farm.
  *
- * Indexes improve query performance by allowing MongoDB to quickly
- * find documents without scanning the entire collection.
+ * MIGRATION NOTE (Phase 2):
+ * The orgId-leading indexes below replace the old non-scoped indexes.
+ * Run this ONLY after scripts/migrate-add-orgid.ts has successfully
+ * backfilled orgId on all existing documents.
+ *
+ * Safe rollout order:
+ *   1. Run migrate-add-orgid.ts
+ *   2. Run this script (creates new indexes in background, old ones still exist)
+ *   3. Deploy app code that reads with orgId filter
+ *   4. Drop old indexes via dropOldIndexes() below
  */
 export async function setupIndexes() {
-  console.log("🔧 Setting up database indexes...");
+  console.log("Setting up database indexes...");
 
   const db = await getDb();
 
   // ============================================================
-  // REGISTRANTS COLLECTION INDEXES
+  // REGISTRANTS — orgId-leading
   // ============================================================
 
-  console.log("  📋 Creating indexes for 'registrants' collection...");
-
-  // Unique index for duplicate checking — prevents concurrent duplicate registrations
-  // Query: collection.insertOne({ email, date }) — E11000 on duplicate
+  // Primary duplicate guard: one registration per (org, email, day)
   await db.collection('registrants').createIndex(
-    { email: 1, date: 1 },
-    { unique: true, name: 'email_date_unique_idx' }
+    { orgId: 1, email: 1, date: 1 },
+    { unique: true, name: 'orgId_email_date_unique_idx', background: true }
   );
-  console.log("    ✅ Created: { email: 1, date: 1 } (unique)");
+  console.log("  registrants: { orgId, email, date } unique");
 
-  // Index for admin page queries (used in app/admin/registrants/page.tsx)
-  // Query: collection.find({ date }).sort({ enteredAt: 1 })
+  // Admin list page sort
   await db.collection('registrants').createIndex(
-    { date: 1, enteredAt: 1 },
-    { name: 'date_enteredAt_idx' }
+    { orgId: 1, date: 1, enteredAt: 1 },
+    { name: 'orgId_date_enteredAt_idx', background: true }
   );
-  console.log("    ✅ Created: { date: 1, enteredAt: 1 }");
+  console.log("  registrants: { orgId, date, enteredAt }");
 
   // ============================================================
-  // TICKETS COLLECTION INDEXES
+  // LOTTERIES — orgId-leading
   // ============================================================
 
-  console.log("  🎫 Creating indexes for 'tickets' collection...");
+  // One lottery per (org, day); also serves as draw atomic-lock key
+  await db.collection('lotteries').createIndex(
+    { orgId: 1, date: 1 },
+    { unique: true, name: 'orgId_date_unique_idx', background: true }
+  );
+  console.log("  lotteries: { orgId, date } unique");
 
-  // Index for winners page (used in app/winners/page.tsx)
-  // Query: collection.find({ date, status: { $in: [...] } }).sort({ ticketNumber: 1 })
+  // ============================================================
+  // TICKETS — orgId-leading
+  // ============================================================
+
+  // Winners page query + sort
   await db.collection('tickets').createIndex(
-    { date: 1, status: 1, ticketNumber: 1 },
-    { name: 'winners_page_idx' }
+    { orgId: 1, date: 1, status: 1, ticketNumber: 1 },
+    { name: 'orgId_winners_page_idx', background: true }
   );
-  console.log("    ✅ Created: { date: 1, status: 1, ticketNumber: 1 }");
+  console.log("  tickets: { orgId, date, status, ticketNumber }");
 
-  // Unique index for ticket ID lookups (ensures no duplicate ticket IDs)
-  // Query: collection.findOne({ ticketId: "123456" })
+  // Globally unique ticket ID (unchanged — ticketId is already globally unique)
   await db.collection('tickets').createIndex(
     { ticketId: 1 },
-    { unique: true, name: 'ticketId_unique_idx' }
+    { unique: true, name: 'ticketId_unique_idx', background: true }
   );
-  console.log("    ✅ Created: { ticketId: 1 } (unique)");
+  console.log("  tickets: { ticketId } unique");
 
-  // Index for finding user's tickets by email
-  // Query: collection.find({ email, date })
+  // Email lookup per org+day
   await db.collection('tickets').createIndex(
-    { email: 1, date: 1 },
-    { name: 'email_date_idx' }
+    { orgId: 1, email: 1, date: 1 },
+    { name: 'orgId_email_date_idx', background: true }
   );
-  console.log("    ✅ Created: { email: 1, date: 1 }");
+  console.log("  tickets: { orgId, email, date }");
 
   // ============================================================
-  // LOTTERIES COLLECTION INDEXES
+  // ORGANIZATIONS
   // ============================================================
 
-  console.log("  🎰 Creating indexes for 'lotteries' collection...");
-
-  // Unique index for lottery date (ensures only one lottery per day)
-  // Query: collection.findOne({ date })
-  await db.collection('lotteries').createIndex(
-    { date: 1 },
-    { unique: true, name: 'date_unique_idx' }
+  await db.collection('organizations').createIndex(
+    { clerkOrgId: 1 },
+    { unique: true, name: 'clerkOrgId_unique_idx', background: true }
   );
-  console.log("    ✅ Created: { date: 1 } (unique)");
+  console.log("  organizations: { clerkOrgId } unique");
 
-  console.log("\n✅ All indexes created successfully!");
-  console.log("\n📊 Index Summary:");
-  console.log("  • registrants: 2 indexes");
-  console.log("  • tickets: 3 indexes");
-  console.log("  • lotteries: 1 index");
-  console.log("  • Total: 6 indexes\n");
+  await db.collection('organizations').createIndex(
+    { slug: 1 },
+    { unique: true, name: 'slug_unique_idx', background: true }
+  );
+  console.log("  organizations: { slug } unique");
+
+  // ============================================================
+  // PROCESSED_WEBHOOK_EVENTS — Stripe idempotency
+  // ============================================================
+
+  await db.collection('processed_webhook_events').createIndex(
+    { stripeEventId: 1 },
+    { unique: true, name: 'stripeEventId_unique_idx', background: true }
+  );
+  console.log("  processed_webhook_events: { stripeEventId } unique");
+
+  console.log("\nAll indexes created (building in background if new).");
+}
+
+/**
+ * Drop old pre-orgId indexes after Phase 2 migration is stable.
+ * Only run after confirming all queries use orgId-leading indexes.
+ */
+export async function dropOldIndexes() {
+  const db = await getDb();
+  const drops = [
+    { col: 'registrants', name: 'email_date_unique_idx' },
+    { col: 'registrants', name: 'date_enteredAt_idx' },
+    { col: 'lotteries',   name: 'date_unique_idx' },
+    { col: 'tickets',     name: 'winners_page_idx' },
+    { col: 'tickets',     name: 'email_date_idx' },
+  ];
+  for (const { col, name } of drops) {
+    try {
+      await db.collection(col).dropIndex(name);
+      console.log(`Dropped: ${col}.${name}`);
+    } catch {
+      console.log(`Skip (not found): ${col}.${name}`);
+    }
+  }
 }
 
 /**
@@ -91,11 +130,8 @@ export async function setupIndexes() {
  */
 export async function listIndexes() {
   const db = await getDb();
-
-  console.log("\n📋 Current Indexes:\n");
-
-  const collections = ['registrants', 'tickets', 'lotteries'];
-
+  const collections = ['registrants', 'tickets', 'lotteries', 'organizations', 'processed_webhook_events'];
+  console.log("\nCurrent Indexes:\n");
   for (const collName of collections) {
     const indexes = await db.collection(collName).indexes();
     console.log(`${collName}:`);
