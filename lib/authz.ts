@@ -1,4 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
+import type { Organization } from "@/lib/types";
 
 type OrgRole = "org:admin" | "org:member";
 
@@ -29,4 +30,24 @@ export async function requireRole(minRole: OrgRole): Promise<{ userId: string; o
   }
 
   return { userId, orgId, orgRole };
+}
+
+/**
+ * Throws if the organization's subscription is in a degraded state that
+ * blocks write operations (past_due or canceled).
+ *
+ * Billing portal access is intentionally NOT gated here — it must remain
+ * accessible so admins can resolve payment issues.
+ */
+export function requireActiveSub(org: Organization): void {
+  if (org.subscriptionStatus === "past_due") {
+    throw new Error(
+      "Your subscription has a past-due payment. Please update your billing to continue."
+    );
+  }
+  if (org.subscriptionStatus === "canceled") {
+    throw new Error(
+      "Your subscription has been canceled. Please re-subscribe to access this feature."
+    );
+  }
 }

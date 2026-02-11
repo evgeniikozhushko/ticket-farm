@@ -48,7 +48,7 @@ const data = {
     },
     {
       title: "Billing",
-      url: "#",
+      url: "/billing",
       icon: IconListDetails,
     },
   ],

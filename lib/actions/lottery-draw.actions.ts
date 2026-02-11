@@ -4,7 +4,7 @@ import { ObjectId } from "mongodb";
 import { getRegistrantsCollection, getLotteriesCollection, getTicketsCollection } from "@/lib/mongodb";
 import { getTodayDateString } from "@/lib/date";
 import type { DrawLotteryResult, WinnerInfo, Ticket } from "@/lib/types";
-import { requireRole } from "@/lib/authz";
+import { requireRole, requireActiveSub } from "@/lib/authz";
 import { getOrganization } from "@/lib/actions/org.actions";
 import { inngest } from "@/inngest/client";
 import type { EmailTicket } from "@/lib/email";
@@ -36,6 +36,13 @@ export async function drawTodayLottery(
     const org = await getOrganization(orgId);
     if (!org) {
       return { success: false, error: "Organization not found." };
+    }
+
+    // Block draw when subscription is degraded
+    try {
+      requireActiveSub(org);
+    } catch (subErr) {
+      return { success: false, error: (subErr as Error).message };
     }
 
     const date = getTodayDateString(org.timezone);
