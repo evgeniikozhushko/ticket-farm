@@ -5,6 +5,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { OrgSettingsForm } from "@/components/org-settings-form";
 import { getOrganization } from "@/lib/actions/org.actions";
+import type { SerializedOrganization } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -18,13 +19,13 @@ export default async function OrgSettingsPage() {
   if (!org) redirect("/onboarding");
 
   // Serialize for RSC boundary (Date → string)
-  const serializedOrg = {
+  const serializedOrg: SerializedOrganization = {
     ...org,
     _id: org._id?.toString(),
     createdAt: org.createdAt.toISOString(),
     updatedAt: org.updatedAt.toISOString(),
     statusUpdatedAt: org.statusUpdatedAt?.toISOString(),
-  } as any;
+  };
 
   return (
     <SidebarProvider

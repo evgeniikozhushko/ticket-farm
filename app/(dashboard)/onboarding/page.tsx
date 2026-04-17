@@ -1,6 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { getOrganization, createOrganization } from "@/lib/actions/org.actions";
+import { getOrganization } from "@/lib/actions/org.actions";
 import { OnboardingForm } from "@/components/onboarding-form";
 
 export default async function OnboardingPage() {

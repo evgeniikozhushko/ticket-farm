@@ -113,6 +113,25 @@ export interface LotteryStats {
   maxTicketsAvailable: number;
 }
 
+export type SerializedOrganization = Omit<
+  Organization,
+  "_id" | "createdAt" | "updatedAt" | "statusUpdatedAt"
+> & {
+  _id?: string;
+  createdAt: string;
+  updatedAt: string;
+  statusUpdatedAt?: string;
+};
+
+export type SerializedRegistrant = Omit<Registrant, "_id" | "enteredAt"> & {
+  _id?: string;
+  enteredAt: string;
+};
+
+export type SerializedLotteryStats = Omit<LotteryStats, "drawnAt"> & {
+  drawnAt?: string;
+};
+
 export type DrawLotteryResult =
   | {
       success: true;

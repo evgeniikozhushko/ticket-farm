@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { updateOrganizationSettings } from "@/lib/actions/org.actions";
-import type { Organization } from "@/lib/types";
+import type { SerializedOrganization } from "@/lib/types";
 
 const COMMON_TIMEZONES = [
   "America/Edmonton",
@@ -21,7 +21,7 @@ const COMMON_TIMEZONES = [
   "UTC",
 ];
 
-export function OrgSettingsForm({ org }: { org: Organization }) {
+export function OrgSettingsForm({ org }: { org: SerializedOrganization }) {
   const [name, setName] = useState(org.name);
   const [slug, setSlug] = useState(org.slug);
   const [timezone, setTimezone] = useState(org.timezone);

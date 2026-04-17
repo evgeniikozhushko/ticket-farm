@@ -9,6 +9,7 @@ import {
   getTodayRegistrants,
   getTodayWinners,
 } from "@/lib/actions/lottery-query.actions";
+import type { SerializedLotteryStats, SerializedRegistrant } from "@/lib/types";
 
 export const dynamic = 'force-dynamic';
 
@@ -22,16 +23,16 @@ export default async function LotteryAdminPage() {
 
   // Serialize MongoDB data for client components
   // Convert ObjectId and Date objects to plain strings for React serialization
-  const serializedStats = {
+  const serializedStats: SerializedLotteryStats = {
     ...stats,
     drawnAt: stats.drawnAt?.toISOString(),
-  } as any;
+  };
 
-  const serializedRegistrants = registrants.map((r) => ({
+  const serializedRegistrants: SerializedRegistrant[] = registrants.map((r) => ({
     ...r,
     _id: r._id?.toString() ?? "",
     enteredAt: r.enteredAt.toISOString(),
-  })) as any;
+  }));
 
   // Winners are already serialized by getTodayWinners()
   const serializedWinners = winners;
