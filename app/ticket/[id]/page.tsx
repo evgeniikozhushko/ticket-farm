@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 
-export default function TicketPage({ params }: { params: { id: string } }) {
+export default function TicketPage() {
 	const today = new Date().toLocaleDateString("en-US", {
 		weekday: "long",
 		year: "numeric",
@@ -9,12 +9,7 @@ export default function TicketPage({ params }: { params: { id: string } }) {
 		day: "numeric",
 	})
 
-	const generatedTime = new Date().toLocaleTimeString("en-US", {
-		hour: "2-digit",
-		minute: "2-digit",
-	})
-
-	// Mock ticket data (in real app, fetch based on params.id)
+	// Mock ticket data (in real app, fetch based on _props.params.id)
 	const ticket = {
 		number: "027",
 		id: "938271",

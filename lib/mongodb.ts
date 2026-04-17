@@ -1,5 +1,5 @@
 import { MongoClient, Db, Collection } from 'mongodb'
-import type { Registrant, Lottery, Ticket } from './types'
+import type { Registrant, Lottery, Ticket, Organization, ProcessedWebhookEvent } from './types'
 
 const uri = process.env.MONGODB_URI
 const dbName = process.env.MONGODB_DB_NAME
@@ -67,4 +67,14 @@ export async function getLotteriesCollection(): Promise<Collection<Lottery>> {
 export async function getTicketsCollection(): Promise<Collection<Ticket>> {
   const db = await getDb();
   return db.collection<Ticket>("tickets");
+}
+
+export async function getOrganizationsCollection(): Promise<Collection<Organization>> {
+  const db = await getDb();
+  return db.collection<Organization>("organizations");
+}
+
+export async function getProcessedWebhookEventsCollection(): Promise<Collection<ProcessedWebhookEvent>> {
+  const db = await getDb();
+  return db.collection<ProcessedWebhookEvent>("processed_webhook_events");
 }

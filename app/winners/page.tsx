@@ -115,8 +115,8 @@ export default async function WinnersPage() {
           ) : (
             // Empty state when no tickets exist
             <div className="py-8 text-center text-muted-foreground">
-              <p className="text-lg font-medium">The lottery hasn't been drawn yet.</p>
-              <p className="mt-2 text-sm">Winners will appear here once the admin runs today's lottery.</p>
+              <p className="text-lg font-medium">The lottery hasn&apos;t been drawn yet.</p>
+              <p className="mt-2 text-sm">Winners will appear here once the admin runs today&apos;s lottery.</p>
             </div>
           )}
 

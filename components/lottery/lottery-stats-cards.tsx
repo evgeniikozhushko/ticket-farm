@@ -3,10 +3,10 @@
 import { Card, CardHeader, CardDescription, CardTitle, CardAction, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { IconUsers, IconTrophy, IconClock, IconCheck } from "@tabler/icons-react";
-import type { LotteryStats } from "@/lib/types";
+import type { SerializedLotteryStats } from "@/lib/types";
 
 interface LotteryStatsCardsProps {
-  stats: LotteryStats;
+  stats: SerializedLotteryStats;
 }
 
 export function LotteryStatsCards({ stats }: LotteryStatsCardsProps) {
@@ -37,7 +37,7 @@ export function LotteryStatsCards({ stats }: LotteryStatsCardsProps) {
     }
   };
 
-  const formatTime = (date?: Date) => {
+  const formatTime = (date?: string) => {
     if (!date) return "N/A";
     return new Date(date).toLocaleTimeString("en-US", {
       hour: "2-digit",

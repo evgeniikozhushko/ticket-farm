@@ -6,10 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { IconSearch, IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
-import type { Registrant } from "@/lib/types";
+import type { SerializedRegistrant } from "@/lib/types";
 
 interface RegistrantsDataTableProps {
-  registrants: Registrant[];
+  registrants: SerializedRegistrant[];
 }
 
 const ITEMS_PER_PAGE = 10;
@@ -76,7 +76,7 @@ export function RegistrantsDataTable({ registrants }: RegistrantsDataTableProps)
     return sortDirection === "asc" ? " ↑" : " ↓";
   };
 
-  const formatTime = (date: Date) => {
+  const formatTime = (date: string) => {
     return new Date(date).toLocaleTimeString("en-US", {
       hour: "2-digit",
       minute: "2-digit",
@@ -89,7 +89,7 @@ export function RegistrantsDataTable({ registrants }: RegistrantsDataTableProps)
       <CardHeader>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <CardTitle>Today's Registrants</CardTitle>
+            <CardTitle>Today&apos;s Registrants</CardTitle>
             <CardDescription>
               {filteredRegistrants.length} {filteredRegistrants.length === 1 ? "registrant" : "registrants"}
               {searchQuery && ` matching "${searchQuery}"`}
