@@ -1,36 +1,92 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Ticket Farm
 
-## Getting Started
+**Multi-tenant SaaS lottery & ticket management platform** — Organizations run daily lotteries where users register for free, winners are drawn automatically, and tickets are emailed with pickup details.
 
-First, run the development server:
+🔗 **Live Demo:** [ticket-farm.vercel.app](https://ticket-farm.vercel.app)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+---
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🎯 What It Does
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- Organizations create a branded public registration page (e.g., `/my-org`)
+- Daily lottery draws: register today → win tickets for tomorrow
+- Winners receive email tickets with QR codes/pickup details
+- Admin dashboard to view registrants, run draws, manage settings
+- Subscription plans with tiered daily registration limits
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## 🏗️ Architecture Highlights
 
-To learn more about Next.js, take a look at the following resources:
+| Aspect | Implementation |
+|--------|---------------|
+| **Multi-tenancy** | Shared MongoDB with `orgId` scoping; Clerk organizations for auth |
+| **Race condition safety** | Atomic quotas, unique indexes, draw locks |
+| **Email delivery** | Inngest durable queue — no Vercel timeout risks |
+| **Billing** | Stripe subscriptions with webhook idempotency |
+| **Performance** | LRU cache for org slug lookups (500 entries, 5-min TTL) |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 🛠️ Tech Stack
 
-## Deploy on Vercel
+- **Framework:** Next.js 16 (App Router, React 19, React Compiler)
+- **Language:** TypeScript 5 (strict mode)
+- **Auth:** Clerk (users + organizations + roles)
+- **Database:** MongoDB Atlas
+- **Payments:** Stripe (subscriptions, customer portal)
+- **Background Jobs:** Inngest
+- **Email:** Resend + React Email
+- **UI:** Shadcn/ui, Radix UI, Tailwind CSS v4
+- **Tables:** TanStack Table v8
+- **Charts:** Recharts
+- **Validation:** Zod v4
+- **Package Manager:** pnpm
+- **Deployment:** Vercel
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 📊 Subscription Plans
+
+| Plan | Price | Daily registrant limit |
+|------|-------|----------------------|
+| Free | $0 | 100 |
+| Starter | $29/mo | 500 |
+| Growth | $79/mo | 2,000 |
+| Scale | $199/mo | Unlimited |
+
+**State handling:** `trialing`/`active` = full access; `past_due` = read-only dashboard; `canceled` = free-tier limits apply.
+
+---
+
+## 🔐 Authorization
+
+- `org:admin` — Run draws, edit settings, access billing
+- `org:member` — View registrants and stats
+- Public — Registration form and winners page
+
+Roles are hierarchical (admin satisfies member checks).
+
+---
+
+## 🚀 Key Technical Features
+
+### Data Integrity
+- **Atomic quota enforcement:** `findOneAndUpdate` with `$inc + $lt` guard prevents over-registration
+- **Duplicate prevention:** Unique index `{ orgId, email, date }` with jittered retry for race conditions
+- **Draw locking:** `updateOne({ status: { $ne: "LOTTERY_DRAWN" } })` prevents double-draws
+- **Idempotent webhooks:** Stripe events deduplicated with out-of-order protection
+
+### Performance
+- All database indexes are `orgId`-leading for query isolation
+- Public slug lookups use in-process LRU cache (no DB roundtrip per request)
+- Authenticated routes get `orgId` directly from Clerk session
+
+### Email Reliability
+- Draws emit Inngest events → emails sent outside HTTP lifecycle
+- Tracks `emailSent`, `emailSentAt`, `emailError` per ticket
+- Automatic retries on failure
+
+---
+
+## 📁 Project Structure (Key Files)
