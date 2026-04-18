@@ -21,7 +21,8 @@ export default async function BillingPage({
 }) {
   const { userId, orgId, orgRole } = await auth();
 
-  if (!userId || !orgId) redirect("/sign-in");
+  if (!userId) redirect("/sign-in");
+  if (!orgId) redirect("/onboarding");
   if (orgRole !== "org:admin") redirect("/dashboard/lottery");
 
   const org = await getOrganization(orgId);
