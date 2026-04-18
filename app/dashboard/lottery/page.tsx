@@ -4,6 +4,8 @@ import { SiteHeader } from "@/components/site-header";
 import { LotteryStatsCards } from "@/components/lottery/lottery-stats-cards";
 import { LotteryDrawPanel } from "@/components/lottery/lottery-draw-panel";
 import { RegistrantsDataTable } from "@/components/lottery/registrants-data-table";
+import { auth } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
 import {
   getTodayLotteryStats,
   getTodayRegistrants,
@@ -14,6 +16,11 @@ import type { SerializedLotteryStats, SerializedRegistrant } from "@/lib/types";
 export const dynamic = 'force-dynamic';
 
 export default async function LotteryAdminPage() {
+  const { userId, orgId } = await auth();
+
+  if (!userId) redirect("/sign-in");
+  if (!orgId) redirect("/onboarding");
+
   // Fetch all data in parallel
   const [stats, registrants, winners] = await Promise.all([
     getTodayLotteryStats(),
