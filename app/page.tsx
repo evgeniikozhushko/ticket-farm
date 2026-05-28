@@ -2,7 +2,9 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
 export default async function RootPage() {
-  const { userId } = await auth();
+  const { userId, orgId } = await auth();
 
-  redirect(userId ? "/dashboard/lottery" : "/sign-in");
+  if (!userId) redirect("/sign-in");
+  if (!orgId) redirect("/onboarding");
+  redirect("/dashboard/lottery");
 }

@@ -1,5 +1,13 @@
 import { MongoClient, Db, Collection } from 'mongodb'
-import type { Registrant, Lottery, Ticket, Organization, ProcessedWebhookEvent } from './types'
+import type {
+  Registrant,
+  Lottery,
+  Ticket,
+  Organization,
+  ProcessedWebhookEvent,
+  EmailDispatch,
+  PublicRegistrationRateLimit,
+} from './types'
 
 const uri = process.env.MONGODB_URI
 const dbName = process.env.MONGODB_DB_NAME
@@ -32,7 +40,7 @@ const mongoClientCache: CachedMongoClient =
 
 globalForMongo._mongoClientCache = mongoClientCache;
 
-async function getClient(): Promise<MongoClient>  {
+export async function getClient(): Promise<MongoClient>  {
 
   if (mongoClientCache.client) {
     return mongoClientCache.client
@@ -77,4 +85,14 @@ export async function getOrganizationsCollection(): Promise<Collection<Organizat
 export async function getProcessedWebhookEventsCollection(): Promise<Collection<ProcessedWebhookEvent>> {
   const db = await getDb();
   return db.collection<ProcessedWebhookEvent>("processed_webhook_events");
+}
+
+export async function getEmailDispatchesCollection(): Promise<Collection<EmailDispatch>> {
+  const db = await getDb();
+  return db.collection<EmailDispatch>("email_dispatches");
+}
+
+export async function getPublicRegistrationRateLimitsCollection(): Promise<Collection<PublicRegistrationRateLimit>> {
+  const db = await getDb();
+  return db.collection<PublicRegistrationRateLimit>("public_registration_rate_limits");
 }

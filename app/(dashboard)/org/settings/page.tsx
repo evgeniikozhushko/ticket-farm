@@ -57,7 +57,7 @@ export default async function OrgSettingsPage() {
               <p className="font-medium">Current plan</p>
               <p className="mt-1 text-muted-foreground capitalize">
                 {org.planName} — up to{" "}
-                {org.maxRegistrantsPerDay === Infinity
+                {org.maxRegistrantsPerDay === null
                   ? "unlimited"
                   : org.maxRegistrantsPerDay}{" "}
                 registrants/day

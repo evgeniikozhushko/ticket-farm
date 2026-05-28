@@ -3,7 +3,7 @@
 import { getOrganizationsCollection } from "@/lib/mongodb";
 import { requireRole } from "@/lib/authz";
 import { invalidateOrgCache } from "@/lib/org-cache";
-import { PLAN_LIMITS, getPlanLimit } from "@/lib/plan-limits";
+import { getPlanLimit } from "@/lib/plan-limits";
 import { getOrCreateStripeCustomer } from "@/lib/stripe";
 import type { Organization, PlanName, SubscriptionStatus } from "@/lib/types";
 
@@ -34,7 +34,7 @@ export async function createOrganization(input: {
     emailFromAddress: "hello@ticketfarm.ca",
     subscriptionStatus: "trialing",
     planName: "free",
-    maxRegistrantsPerDay: PLAN_LIMITS.free,
+    maxRegistrantsPerDay: getPlanLimit("free"),
     createdAt: now,
     updatedAt: now,
   };
@@ -129,7 +129,7 @@ export async function updateSubscriptionStatus(
       $set: {
         subscriptionStatus: newStatus,
         planName: newPlanName,
-        maxRegistrantsPerDay: PLAN_LIMITS[newPlanName],
+        maxRegistrantsPerDay: getPlanLimit(newPlanName),
         statusUpdatedAt: eventTimestamp,
         updatedAt: new Date(),
       },

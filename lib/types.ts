@@ -21,7 +21,7 @@ export interface Organization {
   subscriptionStatus: SubscriptionStatus;
   statusUpdatedAt?: Date;       // Timestamp of last Stripe status event (out-of-order guard)
   planName: PlanName;
-  maxRegistrantsPerDay: number; // Enforced atomically via Lottery.registrantCount
+  maxRegistrantsPerDay: number | null; // null means unlimited; enforced via Lottery.registrantCount
   createdAt: Date;
   updatedAt: Date;
 }
@@ -87,6 +87,33 @@ export interface ProcessedWebhookEvent {
   _id?: ObjectId;
   stripeEventId: string;
   processedAt: Date;
+}
+
+export interface EmailDispatch {
+  _id?: ObjectId;
+  orgId: string;
+  date: string;
+  eventName: "lottery/draw.completed";
+  payload: {
+    orgId: string;
+    date: string;
+    tickets: import("@/lib/email").EmailTicket[];
+  };
+  status: "pending" | "dispatched" | "failed";
+  attempts: number;
+  lastError?: string;
+  dispatchedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface PublicRegistrationRateLimit {
+  _id?: ObjectId;
+  key: string;
+  count: number;
+  expiresAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 // ---------------------------------------------------------------------------

@@ -99,6 +99,38 @@ export async function setupIndexes() {
   );
   console.log("  processed_webhook_events: { stripeEventId } unique");
 
+  // ============================================================
+  // EMAIL_DISPATCHES — durable Inngest dispatch outbox
+  // ============================================================
+
+  await db.collection('email_dispatches').createIndex(
+    { orgId: 1, date: 1, eventName: 1 },
+    { unique: true, name: 'orgId_date_eventName_unique_idx', background: true }
+  );
+  console.log("  email_dispatches: { orgId, date, eventName } unique");
+
+  await db.collection('email_dispatches').createIndex(
+    { status: 1, updatedAt: 1 },
+    { name: 'status_updatedAt_idx', background: true }
+  );
+  console.log("  email_dispatches: { status, updatedAt }");
+
+  // ============================================================
+  // PUBLIC_REGISTRATION_RATE_LIMITS — anti-abuse counters
+  // ============================================================
+
+  await db.collection('public_registration_rate_limits').createIndex(
+    { key: 1 },
+    { unique: true, name: 'key_unique_idx', background: true }
+  );
+  console.log("  public_registration_rate_limits: { key } unique");
+
+  await db.collection('public_registration_rate_limits').createIndex(
+    { expiresAt: 1 },
+    { expireAfterSeconds: 0, name: 'expiresAt_ttl_idx', background: true }
+  );
+  console.log("  public_registration_rate_limits: { expiresAt } TTL");
+
   console.log("\nAll indexes created (building in background if new).");
 }
 
@@ -130,7 +162,15 @@ export async function dropOldIndexes() {
  */
 export async function listIndexes() {
   const db = await getDb();
-  const collections = ['registrants', 'tickets', 'lotteries', 'organizations', 'processed_webhook_events'];
+  const collections = [
+    'registrants',
+    'tickets',
+    'lotteries',
+    'organizations',
+    'processed_webhook_events',
+    'email_dispatches',
+    'public_registration_rate_limits',
+  ];
   console.log("\nCurrent Indexes:\n");
   for (const collName of collections) {
     const indexes = await db.collection(collName).indexes();

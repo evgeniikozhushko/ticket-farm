@@ -163,7 +163,7 @@ Architecture (current)
    statusUpdatedAt?: Date;      // Timestamp of last Stripe status event — used for 
  out-of-order protection
    planName: "free" | "starter" | "growth" | "scale";
-   maxRegistrantsPerDay: number; // Enforced atomically (see plan-limit section)
+   maxRegistrantsPerDay: number | null; // null means unlimited; enforced atomically
    createdAt: Date;
    updatedAt: Date;
  }
@@ -547,8 +547,14 @@ Architecture (current)
  /checkin                    Ticket check-in scanner          (Phase 4)
  /api/webhooks/stripe        Stripe webhook receiver          (Phase 3)
  /api/inngest                Inngest handler                  (Phase 2)
- /api/billing/create-checkout  Checkout session               (Phase 3)
- /api/billing/create-portal    Portal session                 (Phase 3)
+/api/billing/create-checkout  Checkout session               (Phase 3)
+/api/billing/create-portal    Portal session                 (Phase 3)
+
+Retired legacy routes:
+
+ /winners                    Retired as 404; use /[orgSlug]/winners
+ /admin/registrants          Redirects to /dashboard/lottery
+ /dashboard                  Redirects to /dashboard/lottery
 
  ---
  Critical Files (in order of modification)
