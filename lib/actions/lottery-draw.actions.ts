@@ -12,7 +12,7 @@ import { getTodayDateString } from "@/lib/date";
 import type { DrawLotteryResult, WinnerInfo, Registrant, Ticket } from "@/lib/types";
 import { requireRole, requireActiveSub } from "@/lib/authz";
 import { getOrganization } from "@/lib/actions/org.actions";
-import { inngest } from "@/inngest/client";
+import { dispatchWinnerEmailEvent } from "@/lib/email-dispatch-outbox";
 import type { EmailTicket } from "@/lib/email";
 
 function shuffleArray<T>(array: T[]): T[] {
@@ -34,57 +34,12 @@ function isDuplicateKeyError(err: unknown): boolean {
   return typeof err === "object" && err !== null && "code" in err && (err as { code: number }).code === 11000;
 }
 
-async function dispatchWinnerEmailEvent(orgId: string, date: string): Promise<void> {
-  const dispatchesCollection = await getEmailDispatchesCollection();
-  const dispatch = await dispatchesCollection.findOne({
-    orgId,
-    date,
-    eventName: "lottery/draw.completed",
-    status: { $in: ["pending", "failed"] },
-  });
-
-  if (!dispatch) return;
-
-  const now = new Date();
-  try {
-    await inngest.send({
-      name: dispatch.eventName,
-      data: dispatch.payload,
-    });
-
-    await dispatchesCollection.updateOne(
-      { _id: dispatch._id },
-      {
-        $set: {
-          status: "dispatched",
-          dispatchedAt: now,
-          updatedAt: now,
-        },
-        $unset: { lastError: "" },
-      }
-    );
-  } catch (err) {
-    await dispatchesCollection.updateOne(
-      { _id: dispatch._id },
-      {
-        $set: {
-          status: "failed",
-          lastError: err instanceof Error ? err.message : String(err),
-          updatedAt: now,
-        },
-        $inc: { attempts: 1 },
-      }
-    );
-    throw err;
-  }
-}
-
 export async function retryWinnerEmailDispatch(
   orgId: string,
   date: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    await dispatchWinnerEmailEvent(orgId, date);
+    await dispatchWinnerEmailEvent({ orgId, date });
     return { success: true };
   } catch (err) {
     return {
@@ -224,7 +179,7 @@ export async function drawTodayLottery(
     // email_dispatches record remains failed and retryWinnerEmailDispatch can
     // safely retry without re-drawing or re-inserting tickets.
     try {
-      await dispatchWinnerEmailEvent(orgId, date);
+      await dispatchWinnerEmailEvent({ orgId, date });
     } catch (err) {
       console.error("[drawTodayLottery] Email dispatch failed:", err);
     }

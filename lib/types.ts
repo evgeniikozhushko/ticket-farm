@@ -99,7 +99,7 @@ export interface EmailDispatch {
     date: string;
     tickets: import("@/lib/email").EmailTicket[];
   };
-  status: "pending" | "dispatched" | "failed";
+  status: "pending" | "dispatching" | "dispatched" | "failed";
   attempts: number;
   lastError?: string;
   dispatchedAt?: Date;

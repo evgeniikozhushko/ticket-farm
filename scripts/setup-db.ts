@@ -13,7 +13,7 @@
  * Then run: npm run setup-db
  */
 
-import { setupIndexes, listIndexes } from '../lib/setup-indexes';
+import { setupIndexes, listIndexes, verifyRequiredIndexes } from '../lib/setup-indexes';
 
 async function main() {
   console.log("╔════════════════════════════════════════════════╗");
@@ -26,6 +26,7 @@ async function main() {
 
     // List all indexes for verification
     await listIndexes();
+    await verifyRequiredIndexes();
 
     console.log("╔════════════════════════════════════════════════╗");
     console.log("║    ✅ Setup completed successfully!           ║");
