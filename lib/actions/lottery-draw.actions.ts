@@ -34,21 +34,6 @@ function isDuplicateKeyError(err: unknown): boolean {
   return typeof err === "object" && err !== null && "code" in err && (err as { code: number }).code === 11000;
 }
 
-export async function retryWinnerEmailDispatch(
-  orgId: string,
-  date: string
-): Promise<{ success: boolean; error?: string }> {
-  try {
-    await dispatchWinnerEmailEvent({ orgId, date });
-    return { success: true };
-  } catch (err) {
-    return {
-      success: false,
-      error: err instanceof Error ? err.message : "Failed to dispatch winner email event.",
-    };
-  }
-}
-
 export async function drawTodayLottery(
   winnerCount: number
 ): Promise<DrawLotteryResult> {
@@ -176,8 +161,8 @@ export async function drawTodayLottery(
     }
 
     // Dispatch only after the transaction commits. If dispatch fails, the
-    // email_dispatches record remains failed and retryWinnerEmailDispatch can
-    // safely retry without re-drawing or re-inserting tickets.
+    // email_dispatches row stays in `failed` and recoverWinnerEmailDispatchesFunction
+    // (cron, every 15 min) will retry it without re-drawing or re-inserting tickets.
     try {
       await dispatchWinnerEmailEvent({ orgId, date });
     } catch (err) {

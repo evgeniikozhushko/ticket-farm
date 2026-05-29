@@ -119,3 +119,13 @@ describe("drawTodayLottery", () => {
     expect(dispatchWinnerEmailEventMock).toHaveBeenCalledWith({ orgId: "org_1", date: "2026-05-28" });
   });
 });
+
+describe("retryWinnerEmailDispatch (removed)", () => {
+  // Tripwire: prior version exported a "use server" retryWinnerEmailDispatch(orgId, date)
+  // with no auth check, enabling cross-tenant IDOR. If this name reappears, the fix
+  // must re-derive orgId from requireRole(...) — see the saas-one security review.
+  it("is not exported from lottery-draw.actions", async () => {
+    const mod = (await loadAction()) as Record<string, unknown>;
+    expect(mod.retryWinnerEmailDispatch).toBeUndefined();
+  });
+});
