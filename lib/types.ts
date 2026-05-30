@@ -80,6 +80,33 @@ export interface Ticket {
 }
 
 // ---------------------------------------------------------------------------
+// Participants
+// ---------------------------------------------------------------------------
+
+export type ParticipantSummary = {
+  orgId: string;
+  email: string;
+  latestName: string;
+  firstEnteredAt: Date;
+  lastEnteredAt: Date;
+  entryCount: number;
+  winCount: number;
+  activeTicketCount: number;
+  checkedInTicketCount: number;
+};
+
+export type ParticipantHistoryEntry = {
+  date: string;
+  enteredAt: Date;
+  won: boolean;
+  ticketNumber?: number;
+  ticketId?: string;
+  ticketStatus?: TicketStatus;
+  emailSent?: boolean;
+  emailError?: string;
+};
+
+// ---------------------------------------------------------------------------
 // Webhook idempotency
 // ---------------------------------------------------------------------------
 

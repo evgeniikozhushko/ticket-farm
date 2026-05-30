@@ -35,8 +35,8 @@ const data = {
       icon: IconChartBar,
     },
     {
-      title: "Members",
-      url: "#",
+      title: "Participants",
+      url: "/dashboard/participants",
       icon: IconUsers,
     },
   ],
