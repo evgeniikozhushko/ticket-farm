@@ -147,6 +147,8 @@ export async function enterLottery(
     //
     // The conditional `registrantCount` guard is only included for capped plans.
     // A null maxRegistrantsPerDay means unlimited and skips the $lt guard.
+    // Legacy lottery rows may not have registrantCount yet; treat a missing
+    // counter as 0 so the next registration can initialize it with $inc.
     //
     // $inc alone initializes registrantCount to 1 on new documents (MongoDB treats
     // a missing field as 0). Do NOT also set registrantCount in $setOnInsert —
@@ -166,7 +168,12 @@ export async function enterLottery(
             status: { $ne: "LOTTERY_DRAWN" },
             ...(org.maxRegistrantsPerDay === null
               ? {}
-              : { registrantCount: { $lt: org.maxRegistrantsPerDay } }),
+              : {
+                  $or: [
+                    { registrantCount: { $lt: org.maxRegistrantsPerDay } },
+                    { registrantCount: { $exists: false } },
+                  ],
+                }),
           },
           {
             $inc: { registrantCount: 1 },

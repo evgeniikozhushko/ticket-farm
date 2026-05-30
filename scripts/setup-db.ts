@@ -13,9 +13,13 @@
  * Then run: npm run setup-db
  */
 
-import { setupIndexes, listIndexes, verifyRequiredIndexes } from '../lib/setup-indexes';
+import * as dotenv from "dotenv";
+
+dotenv.config({ path: ".env.local" });
 
 async function main() {
+  const { setupIndexes, listIndexes, verifyRequiredIndexes } = await import('../lib/setup-indexes');
+
   console.log("╔════════════════════════════════════════════════╗");
   console.log("║    Ticket Farm Database Setup Script              ║");
   console.log("╚════════════════════════════════════════════════╝\n");

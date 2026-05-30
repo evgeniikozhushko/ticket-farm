@@ -47,6 +47,25 @@ async function migrate() {
     }
   }
 
+  const lotteries = db.collection("lotteries");
+  const legacyLotteries = await lotteries
+    .find({ registrantCount: { $exists: false } }, { projection: { _id: 1, orgId: 1, date: 1 } })
+    .toArray();
+
+  console.log(`  lotteries: ${legacyLotteries.length} documents missing registrantCount`);
+
+  for (const lottery of legacyLotteries) {
+    const count = await db.collection("registrants").countDocuments({
+      orgId: lottery.orgId,
+      date: lottery.date,
+    });
+
+    await lotteries.updateOne(
+      { _id: lottery._id },
+      { $set: { registrantCount: count } }
+    );
+  }
+
   // Verify: check no documents are missing orgId
   console.log("\nVerification:");
   for (const collName of collections) {
@@ -56,6 +75,16 @@ async function migrate() {
     } else {
       console.log(`  ✅ ${collName}: all documents have orgId`);
     }
+  }
+
+  const missingRegistrantCount = await lotteries.countDocuments({
+    registrantCount: { $exists: false },
+  });
+
+  if (missingRegistrantCount > 0) {
+    console.error(`  ❌ lotteries: ${missingRegistrantCount} documents still missing registrantCount!`);
+  } else {
+    console.log("  ✅ lotteries: all documents have registrantCount");
   }
 
   await client.close();

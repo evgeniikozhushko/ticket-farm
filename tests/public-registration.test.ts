@@ -94,6 +94,63 @@ describe("public registration", () => {
     expect(registrantsCollection.insertOne).not.toHaveBeenCalled();
   });
 
+  it("claims a quota slot on legacy lottery documents missing registrantCount", async () => {
+    const { enterLottery } = await loadAction();
+
+    await expect(enterLottery("farm", validForm())).resolves.toEqual({ success: true });
+
+    expect(lotteriesCollection.findOneAndUpdate).toHaveBeenCalledWith(
+      {
+        orgId: "org_1",
+        date: "2026-05-28",
+        status: { $ne: "LOTTERY_DRAWN" },
+        $or: [
+          { registrantCount: { $lt: 100 } },
+          { registrantCount: { $exists: false } },
+        ],
+      },
+      {
+        $inc: { registrantCount: 1 },
+        $setOnInsert: {
+          orgId: "org_1",
+          date: "2026-05-28",
+          status: "OPEN",
+          dailyTheme: "",
+          maxTicketsAvailable: 0,
+        },
+      },
+      { upsert: true, returnDocument: "after" }
+    );
+    expect(registrantsCollection.insertOne).toHaveBeenCalledWith({
+      orgId: "org_1",
+      name: "Person",
+      email: "person@example.com",
+      date: "2026-05-28",
+      enteredAt: expect.any(Date),
+    });
+  });
+
+  it("does not add a registrantCount guard for unlimited plans", async () => {
+    getOrgBySlugMock.mockResolvedValue({
+      clerkOrgId: "org_1",
+      timezone: "America/Edmonton",
+      maxRegistrantsPerDay: null,
+    });
+    const { enterLottery } = await loadAction();
+
+    await expect(enterLottery("farm", validForm())).resolves.toEqual({ success: true });
+
+    expect(lotteriesCollection.findOneAndUpdate).toHaveBeenCalledWith(
+      {
+        orgId: "org_1",
+        date: "2026-05-28",
+        status: { $ne: "LOTTERY_DRAWN" },
+      },
+      expect.any(Object),
+      { upsert: true, returnDocument: "after" }
+    );
+  });
+
   it("rolls back quota on any insert failure", async () => {
     registrantsCollection.insertOne.mockRejectedValue(new Error("write failed"));
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
