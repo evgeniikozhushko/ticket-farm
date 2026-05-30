@@ -19,7 +19,7 @@ export async function createOrganization(input: {
   name: string;
   slug: string;
   timezone: string;
-}): Promise<Organization> {
+}): Promise<{ success: true }> {
   // Called during onboarding — user is authenticated but org doc may not exist yet
   const collection = await getOrganizationsCollection();
 
@@ -51,7 +51,7 @@ export async function createOrganization(input: {
     }
   }
 
-  return org as Organization;
+  return { success: true };
 }
 
 // ---------------------------------------------------------------------------

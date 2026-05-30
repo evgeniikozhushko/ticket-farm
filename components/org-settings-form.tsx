@@ -21,7 +21,17 @@ const COMMON_TIMEZONES = [
   "UTC",
 ];
 
-export function OrgSettingsForm({ org }: { org: SerializedOrganization }) {
+type OrgSettingsFormOrg = Pick<
+  SerializedOrganization,
+  | "name"
+  | "slug"
+  | "timezone"
+  | "publicPageEnabled"
+  | "emailFromName"
+  | "emailFromAddress"
+>;
+
+export function OrgSettingsForm({ org }: { org: OrgSettingsFormOrg }) {
   const [name, setName] = useState(org.name);
   const [slug, setSlug] = useState(org.slug);
   const [timezone, setTimezone] = useState(org.timezone);
