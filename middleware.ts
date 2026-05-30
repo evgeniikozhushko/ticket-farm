@@ -1,4 +1,5 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
 
 const isProtectedRoute = createRouteMatcher([
   "/dashboard(.*)",
@@ -8,11 +9,25 @@ const isProtectedRoute = createRouteMatcher([
   "/onboarding(.*)",
   "/checkin(.*)",
   "/analytics(.*)",
+  "/platform(.*)",
+]);
+
+const isOrgRequiredRoute = createRouteMatcher([
+  "/dashboard(.*)",
+  "/admin(.*)",
+  "/org(.*)",
+  "/billing(.*)",
+  "/checkin(.*)",
+  "/analytics(.*)",
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
   if (isProtectedRoute(req)) {
-    await auth.protect();
+    const { orgId } = await auth.protect();
+
+    if (!orgId && isOrgRequiredRoute(req)) {
+      return NextResponse.redirect(new URL("/onboarding", req.url));
+    }
   }
 });
 

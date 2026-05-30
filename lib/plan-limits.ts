@@ -1,14 +1,20 @@
 import type { PlanName } from "@/lib/types";
 
-export const PLAN_LIMITS: Record<PlanName, number> = {
+export type PlanLimit = number | null;
+
+export const PLAN_LIMITS: Record<PlanName, PlanLimit> = {
   free:    100,
   starter: 500,
   growth:  2000,
-  scale:   Infinity,
+  scale:   null,
 };
 
-export function getPlanLimit(planName: PlanName): number {
+export function getPlanLimit(planName: PlanName): PlanLimit {
   return PLAN_LIMITS[planName];
+}
+
+export function formatPlanLimit(limit: PlanLimit): string {
+  return limit === null ? "Unlimited" : limit.toLocaleString();
 }
 
 /**

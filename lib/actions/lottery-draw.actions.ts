@@ -1,12 +1,18 @@
 "use server";
 
 import { ObjectId } from "mongodb";
-import { getRegistrantsCollection, getLotteriesCollection, getTicketsCollection } from "@/lib/mongodb";
+import {
+  getClient,
+  getEmailDispatchesCollection,
+  getRegistrantsCollection,
+  getLotteriesCollection,
+  getTicketsCollection,
+} from "@/lib/mongodb";
 import { getTodayDateString } from "@/lib/date";
-import type { DrawLotteryResult, WinnerInfo, Ticket } from "@/lib/types";
+import type { DrawLotteryResult, WinnerInfo, Registrant, Ticket } from "@/lib/types";
 import { requireRole, requireActiveSub } from "@/lib/authz";
 import { getOrganization } from "@/lib/actions/org.actions";
-import { inngest } from "@/inngest/client";
+import { dispatchWinnerEmailEvent } from "@/lib/email-dispatch-outbox";
 import type { EmailTicket } from "@/lib/email";
 
 function shuffleArray<T>(array: T[]): T[] {
@@ -20,6 +26,12 @@ function shuffleArray<T>(array: T[]): T[] {
 
 function generateTicketId(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+class DrawUserError extends Error {}
+
+function isDuplicateKeyError(err: unknown): boolean {
+  return typeof err === "object" && err !== null && "code" in err && (err as { code: number }).code === 11000;
 }
 
 export async function drawTodayLottery(
@@ -48,79 +60,114 @@ export async function drawTodayLottery(
     const date = getTodayDateString(org.timezone);
     const lotteriesCollection = await getLotteriesCollection();
     const registrantsCollection = await getRegistrantsCollection();
-
-    const registrants = await registrantsCollection.find({ orgId, date }).toArray();
-
-    if (registrants.length === 0) {
-      return { success: false, error: "No registrants for today. Cannot draw lottery." };
-    }
-
-    if (winnerCount > registrants.length) {
-      return {
-        success: false,
-        error: `Requested ${winnerCount} winners, but only ${registrants.length} registrants available.`,
-      };
-    }
-
-    const shuffled = shuffleArray(registrants);
-    const selectedWinners = shuffled.slice(0, winnerCount);
-    const winnerIds = selectedWinners.map((r) => r._id as ObjectId);
+    const ticketsCollection = await getTicketsCollection();
+    const dispatchesCollection = await getEmailDispatchesCollection();
+    const client = await getClient();
     const drawnAt = new Date();
 
-    // Atomically acquire draw lock — prevents concurrent draws
+    let selectedWinners: Registrant[] = [];
+    let ticketDocuments: Omit<Ticket, "_id">[] = [];
+
     try {
-      await lotteriesCollection.updateOne(
-        { orgId, date, status: { $ne: "LOTTERY_DRAWN" } },
-        {
-          $set: { status: "LOTTERY_DRAWN", winnerRegistrantIds: winnerIds, drawnAt },
-          $setOnInsert: { orgId, date, dailyTheme: "", maxTicketsAvailable: winnerCount, registrantCount: 0 },
-        },
-        { upsert: true }
-      );
-    } catch (lockErr) {
-      if (
-        typeof lockErr === "object" && lockErr !== null &&
-        "code" in lockErr && (lockErr as { code: number }).code === 11000
-      ) {
+      await client.withSession(async (session) => {
+        await session.withTransaction(async () => {
+          const lockResult = await lotteriesCollection.updateOne(
+            { orgId, date, status: { $ne: "LOTTERY_DRAWN" } },
+            { $set: { status: "LOTTERY_DRAWN", drawnAt } },
+            { session }
+          );
+
+          if (lockResult.matchedCount === 0) {
+            throw new DrawUserError("Lottery already drawn for today.");
+          }
+
+          const registrants = await registrantsCollection.find({ orgId, date }, { session }).toArray();
+
+          if (registrants.length === 0) {
+            throw new DrawUserError("No registrants for today. Cannot draw lottery.");
+          }
+
+          if (winnerCount > registrants.length) {
+            throw new DrawUserError(
+              `Requested ${winnerCount} winners, but only ${registrants.length} registrants available.`
+            );
+          }
+
+          selectedWinners = shuffleArray(registrants).slice(0, winnerCount);
+          const winnerIds = selectedWinners.map((r) => r._id as ObjectId);
+
+          ticketDocuments = selectedWinners.map((winner, index) => ({
+            orgId,
+            ticketNumber: index + 1,
+            ticketId: generateTicketId(),
+            name: winner.name,
+            email: winner.email,
+            date,
+            pickupTime: "5:30 PM",
+            status: "ACTIVE",
+            generatedAt: drawnAt,
+          }));
+
+          await ticketsCollection.insertMany(ticketDocuments, { session });
+
+          const emailTickets: EmailTicket[] = ticketDocuments.map((ticket) => ({
+            name: ticket.name,
+            email: ticket.email,
+            ticketNumber: ticket.ticketNumber,
+            ticketId: ticket.ticketId,
+            date: ticket.date,
+            pickupTime: ticket.pickupTime,
+            orgName: org.name,
+            pickupLocation: undefined,
+            emailFromAddress: org.emailFromAddress,
+            emailFromName: org.emailFromName,
+          }));
+
+          const now = new Date();
+          await lotteriesCollection.updateOne(
+            { orgId, date },
+            {
+              $set: {
+                winnerRegistrantIds: winnerIds,
+                maxTicketsAvailable: winnerCount,
+              },
+            },
+            { session }
+          );
+
+          await dispatchesCollection.insertOne(
+            {
+              orgId,
+              date,
+              eventName: "lottery/draw.completed",
+              payload: { orgId, date, tickets: emailTickets },
+              status: "pending",
+              attempts: 0,
+              createdAt: now,
+              updatedAt: now,
+            },
+            { session }
+          );
+        });
+      });
+    } catch (err) {
+      if (err instanceof DrawUserError) {
+        return { success: false, error: err.message };
+      }
+      if (isDuplicateKeyError(err)) {
         return { success: false, error: "Lottery already drawn for today." };
       }
-      throw lockErr;
+      throw err;
     }
 
-    // Generate and insert tickets
-    const ticketsCollection = await getTicketsCollection();
-    const ticketDocuments: Omit<Ticket, "_id">[] = selectedWinners.map((winner, index) => ({
-      orgId,
-      ticketNumber: index + 1,
-      ticketId: generateTicketId(),
-      name: winner.name,
-      email: winner.email,
-      date,
-      pickupTime: "5:30 PM",
-      status: "ACTIVE",
-      generatedAt: drawnAt,
-    }));
-
-    await ticketsCollection.insertMany(ticketDocuments);
-
-    // Emit Inngest event — email sending happens in background, outside HTTP request
-    const emailTickets: EmailTicket[] = ticketDocuments.map((ticket) => ({
-      name: ticket.name,
-      email: ticket.email,
-      ticketNumber: ticket.ticketNumber,
-      ticketId: ticket.ticketId,
-      date: ticket.date,
-      pickupTime: ticket.pickupTime,
-      orgName: org.name,
-      pickupLocation: undefined,
-      emailFromAddress: org.emailFromAddress,
-      emailFromName: org.emailFromName,
-    }));
-
-    await inngest.send({
-      name: "lottery/draw.completed",
-      data: { orgId, date, tickets: emailTickets },
-    });
+    // Dispatch only after the transaction commits. If dispatch fails, the
+    // email_dispatches row stays in `failed` and recoverWinnerEmailDispatchesFunction
+    // (cron, every 15 min) will retry it without re-drawing or re-inserting tickets.
+    try {
+      await dispatchWinnerEmailEvent({ orgId, date });
+    } catch (err) {
+      console.error("[drawTodayLottery] Email dispatch failed:", err);
+    }
 
     const winners: WinnerInfo[] = selectedWinners.map((r, index) => ({
       _id: (r._id as ObjectId).toString(),

@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getOrgBySlug } from "@/lib/org-cache";
 import { RegistrationForm } from "@/components/registration-form";
 import { getTodayDateString } from "@/lib/date";
@@ -9,6 +9,10 @@ export default async function OrgRegistrationPage({
   params: Promise<{ orgSlug: string }>;
 }) {
   const { orgSlug } = await params;
+  const canonicalSlug = orgSlug.toLowerCase();
+
+  if (orgSlug !== canonicalSlug) redirect(`/${canonicalSlug}`);
+
   const org = await getOrgBySlug(orgSlug);
 
   if (!org) notFound();

@@ -21,7 +21,7 @@ export interface Organization {
   subscriptionStatus: SubscriptionStatus;
   statusUpdatedAt?: Date;       // Timestamp of last Stripe status event (out-of-order guard)
   planName: PlanName;
-  maxRegistrantsPerDay: number; // Enforced atomically via Lottery.registrantCount
+  maxRegistrantsPerDay: number | null; // null means unlimited; enforced via Lottery.registrantCount
   createdAt: Date;
   updatedAt: Date;
 }
@@ -80,6 +80,33 @@ export interface Ticket {
 }
 
 // ---------------------------------------------------------------------------
+// Participants
+// ---------------------------------------------------------------------------
+
+export type ParticipantSummary = {
+  orgId: string;
+  email: string;
+  latestName: string;
+  firstEnteredAt: Date;
+  lastEnteredAt: Date;
+  entryCount: number;
+  winCount: number;
+  activeTicketCount: number;
+  checkedInTicketCount: number;
+};
+
+export type ParticipantHistoryEntry = {
+  date: string;
+  enteredAt: Date;
+  won: boolean;
+  ticketNumber?: number;
+  ticketId?: string;
+  ticketStatus?: TicketStatus;
+  emailSent?: boolean;
+  emailError?: string;
+};
+
+// ---------------------------------------------------------------------------
 // Webhook idempotency
 // ---------------------------------------------------------------------------
 
@@ -87,6 +114,33 @@ export interface ProcessedWebhookEvent {
   _id?: ObjectId;
   stripeEventId: string;
   processedAt: Date;
+}
+
+export interface EmailDispatch {
+  _id?: ObjectId;
+  orgId: string;
+  date: string;
+  eventName: "lottery/draw.completed";
+  payload: {
+    orgId: string;
+    date: string;
+    tickets: import("@/lib/email").EmailTicket[];
+  };
+  status: "pending" | "dispatching" | "dispatched" | "failed";
+  attempts: number;
+  lastError?: string;
+  dispatchedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface PublicRegistrationRateLimit {
+  _id?: ObjectId;
+  key: string;
+  count: number;
+  expiresAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 // ---------------------------------------------------------------------------

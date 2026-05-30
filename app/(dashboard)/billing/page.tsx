@@ -7,7 +7,7 @@ import { BillingActionButton } from "@/components/billing-actions";
 import { getOrganization } from "@/lib/actions/org.actions";
 import { getLotteriesCollection } from "@/lib/mongodb";
 import { getTodayDateString } from "@/lib/date";
-import { PLAN_DISPLAY, getPriceIdForPlan, PLAN_LIMITS } from "@/lib/plan-limits";
+import { PLAN_DISPLAY, getPriceIdForPlan, PLAN_LIMITS, formatPlanLimit } from "@/lib/plan-limits";
 import type { PlanName } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -100,7 +100,7 @@ export default async function BillingPage({
                 <p>
                   Daily limit:{" "}
                   <strong>
-                    {org.maxRegistrantsPerDay === Infinity
+                    {org.maxRegistrantsPerDay === null
                       ? "Unlimited"
                       : `${org.maxRegistrantsPerDay.toLocaleString()} registrants`}
                   </strong>
@@ -109,7 +109,7 @@ export default async function BillingPage({
                   Today&apos;s usage:{" "}
                   <strong>
                     {todayUsage.toLocaleString()}
-                    {org.maxRegistrantsPerDay !== Infinity &&
+                    {org.maxRegistrantsPerDay !== null &&
                       ` / ${org.maxRegistrantsPerDay.toLocaleString()}`}
                   </strong>
                 </p>
@@ -147,7 +147,7 @@ export default async function BillingPage({
                         <p className="text-sm text-muted-foreground">{display.price}</p>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {limit === Infinity ? "Unlimited" : limit.toLocaleString()} registrants/day
+                        {formatPlanLimit(limit)} registrants/day
                       </p>
 
                       {isCurrent ? (

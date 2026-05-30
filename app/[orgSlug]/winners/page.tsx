@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getOrgBySlug } from "@/lib/org-cache";
 import { getTicketsCollection, getLotteriesCollection } from "@/lib/mongodb";
 import { getTodayDateString } from "@/lib/date";
@@ -11,6 +11,10 @@ export default async function OrgWinnersPage({
   params: Promise<{ orgSlug: string }>;
 }) {
   const { orgSlug } = await params;
+  const canonicalSlug = orgSlug.toLowerCase();
+
+  if (orgSlug !== canonicalSlug) redirect(`/${canonicalSlug}/winners`);
+
   const org = await getOrgBySlug(orgSlug);
 
   if (!org) notFound();

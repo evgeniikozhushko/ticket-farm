@@ -1,6 +1,12 @@
 "use server";
 
-import { getLotteriesCollection, getRegistrantsCollection } from "@/lib/mongodb";
+import { headers } from "next/headers";
+import { createHash } from "crypto";
+import {
+  getLotteriesCollection,
+  getPublicRegistrationRateLimitsCollection,
+  getRegistrantsCollection,
+} from "@/lib/mongodb";
 import { getTodayDateString } from "@/lib/date";
 import { getOrgBySlug } from "@/lib/org-cache";
 import type { Registrant } from "@/lib/types";
@@ -14,6 +20,74 @@ function isValidEmail(email: string): boolean {
 }
 
 const MAX_QUOTA_RETRIES = 5;
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
+const PUBLIC_IP_REGISTRATION_LIMIT = 20;
+const PUBLIC_EMAIL_REGISTRATION_LIMIT = 5;
+
+function hashRateLimitValue(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+async function getClientIp(): Promise<string> {
+  const requestHeaders = await headers();
+  const forwardedFor = requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim();
+  return (
+    forwardedFor ||
+    requestHeaders.get("x-real-ip") ||
+    requestHeaders.get("cf-connecting-ip") ||
+    "unknown"
+  );
+}
+
+async function consumeRegistrationRateLimit(input: {
+  orgId: string;
+  scope: "ip" | "email";
+  value: string;
+  limit: number;
+}): Promise<boolean> {
+  const now = new Date();
+  const windowStart = Math.floor(now.getTime() / RATE_LIMIT_WINDOW_MS) * RATE_LIMIT_WINDOW_MS;
+  const expiresAt = new Date(windowStart + RATE_LIMIT_WINDOW_MS);
+  const key = [
+    "public-registration",
+    input.orgId,
+    input.scope,
+    hashRateLimitValue(input.value),
+    windowStart,
+  ].join(":");
+
+  const collection = await getPublicRegistrationRateLimitsCollection();
+
+  try {
+    const result = await collection.findOneAndUpdate(
+      { key, count: { $lt: input.limit } },
+      {
+        $inc: { count: 1 },
+        $set: { updatedAt: now },
+        $setOnInsert: {
+          key,
+          expiresAt,
+          createdAt: now,
+        },
+      },
+      { upsert: true, returnDocument: "after" }
+    );
+
+    return result !== null;
+  } catch (err) {
+    if ((err as { code?: number }).code === 11000) {
+      const retryResult = await collection.updateOne(
+        { key, count: { $lt: input.limit } },
+        {
+          $inc: { count: 1 },
+          $set: { updatedAt: now },
+        }
+      );
+      return retryResult.modifiedCount === 1;
+    }
+    throw err;
+  }
+}
 
 export async function enterLottery(
   orgSlug: string,
@@ -44,12 +118,35 @@ export async function enterLottery(
     const date = getTodayDateString(org.timezone);
     const lotteriesCollection = await getLotteriesCollection();
     const registrantsCollection = await getRegistrantsCollection();
+    const ip = await getClientIp();
+
+    const [ipAllowed, emailAllowed] = await Promise.all([
+      consumeRegistrationRateLimit({
+        orgId,
+        scope: "ip",
+        value: ip,
+        limit: PUBLIC_IP_REGISTRATION_LIMIT,
+      }),
+      consumeRegistrationRateLimit({
+        orgId,
+        scope: "email",
+        value: email,
+        limit: PUBLIC_EMAIL_REGISTRATION_LIMIT,
+      }),
+    ]);
+
+    if (!ipAllowed || !emailAllowed) {
+      return {
+        success: false,
+        error: "Too many registration attempts. Please try again later.",
+      };
+    }
 
     // -------------------------------------------------------------------------
     // Step 1: Atomically claim a quota slot on the Lottery document.
     //
-    // The conditional guard `registrantCount: { $lt: maxRegistrantsPerDay }`
-    // ensures the update is a no-op (returns null) when the daily cap is reached.
+    // The conditional `registrantCount` guard is only included for capped plans.
+    // A null maxRegistrantsPerDay means unlimited and skips the $lt guard.
     //
     // $inc alone initializes registrantCount to 1 on new documents (MongoDB treats
     // a missing field as 0). Do NOT also set registrantCount in $setOnInsert —
@@ -67,7 +164,9 @@ export async function enterLottery(
             orgId,
             date,
             status: { $ne: "LOTTERY_DRAWN" },
-            registrantCount: { $lt: org.maxRegistrantsPerDay },
+            ...(org.maxRegistrantsPerDay === null
+              ? {}
+              : { registrantCount: { $lt: org.maxRegistrantsPerDay } }),
           },
           {
             $inc: { registrantCount: 1 },

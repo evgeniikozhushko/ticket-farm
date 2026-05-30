@@ -17,6 +17,10 @@ function stripeStatusToOurs(stripeStatus: string): SubscriptionStatus {
   return "free";
 }
 
+function isDuplicateKeyError(err: unknown): boolean {
+  return typeof err === "object" && err !== null && "code" in err && (err as { code: number }).code === 11000;
+}
+
 export async function POST(req: NextRequest) {
   // ---------------------------------------------------------------------------
   // 1. Verify Stripe signature — reject anything without a valid signature.
@@ -106,7 +110,8 @@ export async function POST(req: NextRequest) {
         const session = event.data.object as Stripe.Checkout.Session;
         const stripeCustomerId =
           typeof session.customer === "string" ? session.customer : null;
-        const clerkOrgId = (session.metadata as Record<string, string> | null)?.clerkOrgId;
+        const metadata = session.metadata as Record<string, string> | null;
+        const clerkOrgId = metadata?.clerkOrgId ?? session.client_reference_id ?? undefined;
 
         if (stripeCustomerId && clerkOrgId) {
           const orgsCollection = await getOrganizationsCollection();
@@ -126,10 +131,16 @@ export async function POST(req: NextRequest) {
     // -------------------------------------------------------------------------
     // 4. Mark event as processed AFTER the org update succeeded.
     // -------------------------------------------------------------------------
-    await processedCollection.insertOne({
-      stripeEventId: event.id,
-      processedAt: new Date(),
-    });
+    try {
+      await processedCollection.insertOne({
+        stripeEventId: event.id,
+        processedAt: new Date(),
+      });
+    } catch (err) {
+      if (!isDuplicateKeyError(err)) {
+        throw err;
+      }
+    }
   } catch (err) {
     console.error("[stripe-webhook] Handler error:", err);
     // Return 500 so Stripe retries. The idempotency check at the top prevents

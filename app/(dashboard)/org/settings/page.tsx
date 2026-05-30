@@ -5,7 +5,6 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { OrgSettingsForm } from "@/components/org-settings-form";
 import { getOrganization } from "@/lib/actions/org.actions";
-import type { SerializedOrganization } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -19,13 +18,13 @@ export default async function OrgSettingsPage() {
   const org = await getOrganization(orgId);
   if (!org) redirect("/onboarding");
 
-  // Serialize for RSC boundary (Date → string)
-  const serializedOrg: SerializedOrganization = {
-    ...org,
-    _id: org._id?.toString(),
-    createdAt: org.createdAt.toISOString(),
-    updatedAt: org.updatedAt.toISOString(),
-    statusUpdatedAt: org.statusUpdatedAt?.toISOString(),
+  const orgSettings = {
+    name: org.name,
+    slug: org.slug,
+    timezone: org.timezone,
+    publicPageEnabled: org.publicPageEnabled,
+    emailFromName: org.emailFromName,
+    emailFromAddress: org.emailFromAddress,
   };
 
   return (
@@ -50,14 +49,14 @@ export default async function OrgSettingsPage() {
               </p>
             </div>
 
-            <OrgSettingsForm org={serializedOrg} />
+            <OrgSettingsForm org={orgSettings} />
 
             {/* Plan info */}
             <div className="max-w-lg rounded-lg border p-4 text-sm">
               <p className="font-medium">Current plan</p>
               <p className="mt-1 text-muted-foreground capitalize">
                 {org.planName} — up to{" "}
-                {org.maxRegistrantsPerDay === Infinity
+                {org.maxRegistrantsPerDay === null
                   ? "unlimited"
                   : org.maxRegistrantsPerDay}{" "}
                 registrants/day
