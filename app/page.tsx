@@ -9,11 +9,11 @@ export default async function RootPage() {
   if (!userId) {
     return (
       <main className="min-h-screen bg-background">
-        <section className="flex min-h-screen items-center px-6 py-16">
-          <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
+        <section className="flex min-h-screen flex-col px-6 py-16">
+          <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col justify-center gap-8">
             <div className="max-w-3xl space-y-5">
               <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-                Ticket Farm
+                Ticket Farm · Private Beta
               </p>
               <h1 className="text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
                 Daily lottery and ticket pickup tools for community organizations.
@@ -32,6 +32,17 @@ export default async function RootPage() {
               </Button>
             </div>
           </div>
+          <footer className="mx-auto mt-12 flex w-full max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
+            <Link href="/privacy" className="hover:text-foreground">
+              Privacy
+            </Link>
+            <Link href="/terms" className="hover:text-foreground">
+              Terms
+            </Link>
+            <a href="mailto:hello@ticketfarm.ca" className="hover:text-foreground">
+              hello@ticketfarm.ca
+            </a>
+          </footer>
         </section>
       </main>
     );
