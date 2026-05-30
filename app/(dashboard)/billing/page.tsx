@@ -177,7 +177,7 @@ export default async function BillingPage({
                         />
                       ) : (
                         <p className="text-xs text-muted-foreground">
-                          Price ID not configured.
+                          Available after beta.
                         </p>
                       )}
                     </div>

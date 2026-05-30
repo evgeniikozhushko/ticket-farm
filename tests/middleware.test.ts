@@ -21,7 +21,7 @@ describe("middleware", () => {
   });
 
   it("allows public routes without auth protection", async () => {
-    const { default: middleware } = await import("@/middleware");
+    const { default: middleware } = await import("@/proxy");
 
     const result = await (middleware as unknown as (req: { url: string }) => Promise<unknown>)({
       url: "https://ticketfarm.test/public-org",
@@ -32,7 +32,7 @@ describe("middleware", () => {
   });
 
   it("allows root without auth protection", async () => {
-    const { default: middleware } = await import("@/middleware");
+    const { default: middleware } = await import("@/proxy");
 
     const result = await (middleware as unknown as (req: { url: string }) => Promise<unknown>)({
       url: "https://ticketfarm.test/",
@@ -44,7 +44,7 @@ describe("middleware", () => {
 
   it("redirects authenticated users without orgId from org-required routes to onboarding", async () => {
     protectMock.mockResolvedValue({ orgId: null });
-    const { default: middleware } = await import("@/middleware");
+    const { default: middleware } = await import("@/proxy");
 
     const result = await (middleware as unknown as (req: { url: string }) => Promise<unknown>)({
       url: "https://ticketfarm.test/dashboard",
@@ -58,7 +58,7 @@ describe("middleware", () => {
 
   it("protects platform routes without requiring org context", async () => {
     protectMock.mockResolvedValue({ orgId: null });
-    const { default: middleware } = await import("@/middleware");
+    const { default: middleware } = await import("@/proxy");
 
     const result = await (middleware as unknown as (req: { url: string }) => Promise<unknown>)({
       url: "https://ticketfarm.test/platform/orgs",

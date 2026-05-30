@@ -11,21 +11,18 @@ that need more than the free 100/day limit granted manually by a platform admin.
 
 - [x] `pnpm lint` fails on `scripts/ensure-next-dev-manifests.cjs` (3 `@typescript-eslint/no-require-imports` errors). — Resolved: added the file to `globalIgnores` in `eslint.config.mjs`.
 - [x] `pnpm build` reportedly hangs locally at "Creating an optimized production build…". — Not reproduced after `pnpm clean && pnpm build`. Build now completes cleanly (compile ~2s, 13 static pages generated, exit 0). Suspected cause: stale `.next` cache. Re-verify on Vercel preview before promoting.
-- [ ] `middleware.ts` uses the legacy convention. Next 16 warns to migrate to `proxy.ts`.
+- [x] `middleware.ts` uses the legacy convention. Next 16 warns to migrate to `proxy.ts`. — Resolved: `git mv middleware.ts proxy.ts`, updated `tests/middleware.test.ts` imports from `@/middleware` → `@/proxy`. All 36 tests pass; build no longer warns.
 
 ## Key changes
 
 ### 1. Fix release blockers
 - [x] Lint: ignored `scripts/ensure-next-dev-manifests.cjs` in `eslint.config.mjs`. `pnpm lint` now exits 0.
 - [x] Build hang: `pnpm clean && pnpm build` resolved it on first try. Build output shows Turbopack compile ~2s, TS check 2.5s, 13 static pages generated, exit 0. Still need to confirm green build on Vercel preview before promotion.
-- [ ] Migrate `middleware.ts` → `proxy.ts` per Next 16. Preserve:
-    - `clerkMiddleware` route protection for `/dashboard`, `/admin`, `/org`, `/billing`, `/onboarding`, `/checkin`, `/analytics`, `/platform`
-    - org-required redirect to `/onboarding` when `orgId` is missing on org-required routes
-    - existing matcher exclusions for static assets and `_next`
+- [x] Migrate `middleware.ts` → `proxy.ts` per Next 16. Done via `git mv` (history preserved). `clerkMiddleware` wrapper, route matchers, and onboarding redirect logic all preserved as-is — Clerk 6.37.3 still only exports `clerkMiddleware`, no `clerkProxy` needed. Build clean, tests green.
 
 ### 2. Configure production infrastructure
-- [ ] Create a fresh MongoDB Atlas production database. Run `pnpm setup-db` once against prod env vars to create indexes.
-- [ ] Configure Vercel production env vars:
+- [ ] (Vercel/Atlas dashboard work) Create a fresh MongoDB Atlas production database. Run `pnpm setup-db` once against prod env vars to create indexes.
+- [ ] (Vercel dashboard work) Configure Vercel production env vars:
     - MongoDB: `MONGODB_URI`, `MONGODB_DB_NAME`
     - Clerk: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, sign-in/up/after-* URLs
     - Resend: `RESEND_API_KEY`
@@ -33,12 +30,14 @@ that need more than the free 100/day limit granted manually by a platform admin.
     - **Intentionally leave unset:** `STRIPE_STARTER_PRICE_ID`, `STRIPE_GROWTH_PRICE_ID`, `STRIPE_SCALE_PRICE_ID` (see §3)
     - Platform: `PLATFORM_ADMIN_USER_IDS`
     - Inngest production: `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY` — provider-side wiring only; app code does not currently read these and does not need to.
-- [ ] Connect `ticketfarm.ca` to the Vercel project; add the domain to Clerk allowed redirect/origin URLs.
-- [ ] Do NOT add Clerk webhooks or `CLERK_WEBHOOK_SECRET` for beta. Org creation stays owned by the in-app onboarding flow.
+- [ ] (Vercel/Clerk dashboard work) Connect `ticketfarm.ca` to the Vercel project; add the domain to Clerk allowed redirect/origin URLs.
+- [x] Do NOT add Clerk webhooks or `CLERK_WEBHOOK_SECRET` for beta. Org creation stays owned by the in-app onboarding flow. Decision recorded; no code change needed.
+- [x] Audited `.env.example` vs every `process.env.*` reference in the codebase. Only gap was `SEED_ORG_ID`, which is read only by the one-shot `scripts/migrate-add-orgid.ts` migration; not relevant for a fresh prod DB, intentionally left out. Added a comment on the `STRIPE_*_PRICE_ID` block documenting the unset-in-beta decision.
 
 ### 3. Beta billing behavior (decision: option C — env-driven, zero code change)
-- [ ] In Vercel production, leave `STRIPE_*_PRICE_ID` unset. The existing `app/(dashboard)/billing/page.tsx:163` branch already falls through to "Price ID not configured", which hides the checkout button without any code change.
-- [ ] Verify `BillingActionButton action="portal"` (line 121) remains gated by `org.stripeCustomerId` — fine to leave since no beta org will have a customer ID in test mode.
+- [x] In Vercel production, leave `STRIPE_*_PRICE_ID` unset. Verified code path: `getPriceIdForPlan` (`lib/plan-limits.ts:32`) returns `undefined`, billing page falls through to the "Available after beta." fallback. (Dashboard step remains — must be set as unset in Vercel during §2.)
+- [x] Verified `BillingActionButton action="portal"` (`app/(dashboard)/billing/page.tsx:118`) is gated by `org.stripeCustomerId`. Beta orgs in test mode without a customer ID will not see it.
+- [x] Bonus: changed the no-priceId fallback copy from operator-style "Price ID not configured." to customer-facing "Available after beta." (`app/(dashboard)/billing/page.tsx:180`).
 - [ ] Document the manual escalation path for beta orgs that need >100/day. `/platform/orgs` is view-only; bumps are made by editing the org document directly in MongoDB Atlas:
     - Find the org document by `clerkOrgId` in the `organizations` collection.
     - Set `planName` to one of `"free" | "starter" | "growth" | "scale"`.
@@ -47,10 +46,10 @@ that need more than the free 100/day limit granted manually by a platform admin.
     - Do not touch `subscriptionStatus` or `stripeCustomerId`; those remain Stripe-owned.
 
 ### 4. Public trust pages (concrete checklist, no design pass)
-- [ ] Home (`app/page.tsx`): hero copy reflecting beta status, one primary CTA (sign up), footer linking to `/privacy` and `/terms`.
-- [ ] About (`app/about`): sanity-check copy is beta-appropriate; no rewrite.
-- [ ] Add `app/privacy/page.tsx`: registration data collected, email use, organization admin model, support contact.
-- [ ] Add `app/terms/page.tsx`: beta terms, acceptable use, no liability for beta downtime, contact.
+- [x] Home (`app/page.tsx`): added "· Private Beta" to the eyebrow line and a footer row with Privacy / Terms / hello@ticketfarm.ca links. Hero copy and primary CTA preserved.
+- [x] About (`app/about`): replaced the placeholder `<div>About</div>` with minimal beta-appropriate copy and a contact link.
+- [x] Added `app/privacy/page.tsx`: account data, lottery-registration data, email use, org isolation, subprocessor list, contact.
+- [x] Added `app/terms/page.tsx`: beta status disclaimer, customer data ownership, acceptable use, beta billing note, limited-liability clause, contact.
 - [ ] Out of beta scope: analytics, check-in scanner, member-management UI. Do not touch.
 
 ## Test plan
@@ -61,7 +60,7 @@ that need more than the free 100/day limit granted manually by a platform admin.
 - [ ] `pnpm build`
 
 ### Test updates
-- [ ] Update `tests/middleware.test.ts` to import and exercise `proxy.ts` post-migration. The existing mocks for `clerkMiddleware` and `createRouteMatcher` should carry over.
+- [x] Update `tests/middleware.test.ts` to import and exercise `proxy.ts` post-migration. Done — 4 `@/middleware` import paths swapped to `@/proxy`; existing mocks carried over unchanged. All 4 cases still pass.
 - [ ] No new automated test for checkout hiding — the mechanism is "env var unset", and a unit test for that is brittle. Cover it in the manual smoke instead.
 
 ### Manual smoke test on Vercel preview
