@@ -3,7 +3,6 @@
 import { UserButton, useUser } from "@clerk/nextjs"
 import {
   SidebarMenu,
-  SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 
@@ -15,10 +14,7 @@ export function NavUser() {
   return (
     <SidebarMenu>
       <SidebarMenuItem>
-        <SidebarMenuButton
-          size="lg"
-          className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-        >
+        <div className="flex min-h-12 w-full items-center gap-2 rounded-md p-2 text-left text-sm">
           <UserButton
             appearance={{
               elements: {
@@ -34,7 +30,7 @@ export function NavUser() {
               {user.primaryEmailAddress?.emailAddress}
             </span>
           </div>
-        </SidebarMenuButton>
+        </div>
       </SidebarMenuItem>
     </SidebarMenu>
   )
