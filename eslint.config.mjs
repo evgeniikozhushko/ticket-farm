@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Node CommonJS helper for dev manifest scaffolding — not app code.
+    "scripts/ensure-next-dev-manifests.cjs",
   ]),
 ]);
 
