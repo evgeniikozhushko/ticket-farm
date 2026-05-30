@@ -9,6 +9,7 @@ const isProtectedRoute = createRouteMatcher([
   "/onboarding(.*)",
   "/checkin(.*)",
   "/analytics(.*)",
+  "/platform(.*)",
 ]);
 
 const isOrgRequiredRoute = createRouteMatcher([

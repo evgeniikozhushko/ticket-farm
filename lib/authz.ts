@@ -32,6 +32,25 @@ export async function requireRole(minRole: OrgRole): Promise<{ userId: string; o
   return { userId, orgId, orgRole };
 }
 
+export async function requirePlatformAdmin(): Promise<{ userId: string }> {
+  const { userId } = await auth();
+
+  if (!userId) {
+    throw new Error("Unauthorized: not authenticated");
+  }
+
+  const allowlist = (process.env.PLATFORM_ADMIN_USER_IDS ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+
+  if (!allowlist.includes(userId)) {
+    throw new Error("Forbidden: platform admin required");
+  }
+
+  return { userId };
+}
+
 /**
  * Throws if the organization's subscription is in a degraded state that
  * blocks write operations (past_due or canceled).

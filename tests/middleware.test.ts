@@ -31,6 +31,17 @@ describe("middleware", () => {
     expect(protectMock).not.toHaveBeenCalled();
   });
 
+  it("allows root without auth protection", async () => {
+    const { default: middleware } = await import("@/middleware");
+
+    const result = await (middleware as unknown as (req: { url: string }) => Promise<unknown>)({
+      url: "https://ticketfarm.test/",
+    });
+
+    expect(result).toBeUndefined();
+    expect(protectMock).not.toHaveBeenCalled();
+  });
+
   it("redirects authenticated users without orgId from org-required routes to onboarding", async () => {
     protectMock.mockResolvedValue({ orgId: null });
     const { default: middleware } = await import("@/middleware");
@@ -43,5 +54,17 @@ describe("middleware", () => {
     expect(result).toBeInstanceOf(Response);
     expect((result as Response).status).toBe(307);
     expect((result as Response).headers.get("location")).toBe("https://ticketfarm.test/onboarding");
+  });
+
+  it("protects platform routes without requiring org context", async () => {
+    protectMock.mockResolvedValue({ orgId: null });
+    const { default: middleware } = await import("@/middleware");
+
+    const result = await (middleware as unknown as (req: { url: string }) => Promise<unknown>)({
+      url: "https://ticketfarm.test/platform/orgs",
+    });
+
+    expect(protectMock).toHaveBeenCalledOnce();
+    expect(result).toBeUndefined();
   });
 });
