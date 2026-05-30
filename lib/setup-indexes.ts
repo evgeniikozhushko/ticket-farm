@@ -143,6 +143,7 @@ export async function dropOldIndexes() {
   const db = await getDb();
   const drops = [
     { col: 'registrants', name: 'email_date_unique_idx' },
+    { col: 'registrants', name: 'email_date_idx' },
     { col: 'registrants', name: 'date_enteredAt_idx' },
     { col: 'lotteries',   name: 'date_unique_idx' },
     { col: 'tickets',     name: 'winners_page_idx' },
