@@ -21,8 +21,8 @@ that need more than the free 100/day limit granted manually by a platform admin.
 - [x] Migrate `middleware.ts` → `proxy.ts` per Next 16. Done via `git mv` (history preserved). `clerkMiddleware` wrapper, route matchers, and onboarding redirect logic all preserved as-is — Clerk 6.37.3 still only exports `clerkMiddleware`, no `clerkProxy` needed. Build clean, tests green.
 
 ### 2. Configure production infrastructure
-- [ ] Create a fresh MongoDB Atlas production database. Run `pnpm setup-db` once against prod env vars to create indexes.
-- [ ] Configure Vercel production env vars:
+- [ ] (Vercel/Atlas dashboard work) Create a fresh MongoDB Atlas production database. Run `pnpm setup-db` once against prod env vars to create indexes.
+- [ ] (Vercel dashboard work) Configure Vercel production env vars:
     - MongoDB: `MONGODB_URI`, `MONGODB_DB_NAME`
     - Clerk: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, sign-in/up/after-* URLs
     - Resend: `RESEND_API_KEY`
@@ -30,12 +30,14 @@ that need more than the free 100/day limit granted manually by a platform admin.
     - **Intentionally leave unset:** `STRIPE_STARTER_PRICE_ID`, `STRIPE_GROWTH_PRICE_ID`, `STRIPE_SCALE_PRICE_ID` (see §3)
     - Platform: `PLATFORM_ADMIN_USER_IDS`
     - Inngest production: `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY` — provider-side wiring only; app code does not currently read these and does not need to.
-- [ ] Connect `ticketfarm.ca` to the Vercel project; add the domain to Clerk allowed redirect/origin URLs.
-- [ ] Do NOT add Clerk webhooks or `CLERK_WEBHOOK_SECRET` for beta. Org creation stays owned by the in-app onboarding flow.
+- [ ] (Vercel/Clerk dashboard work) Connect `ticketfarm.ca` to the Vercel project; add the domain to Clerk allowed redirect/origin URLs.
+- [x] Do NOT add Clerk webhooks or `CLERK_WEBHOOK_SECRET` for beta. Org creation stays owned by the in-app onboarding flow. Decision recorded; no code change needed.
+- [x] Audited `.env.example` vs every `process.env.*` reference in the codebase. Only gap was `SEED_ORG_ID`, which is read only by the one-shot `scripts/migrate-add-orgid.ts` migration; not relevant for a fresh prod DB, intentionally left out. Added a comment on the `STRIPE_*_PRICE_ID` block documenting the unset-in-beta decision.
 
 ### 3. Beta billing behavior (decision: option C — env-driven, zero code change)
-- [ ] In Vercel production, leave `STRIPE_*_PRICE_ID` unset. The existing `app/(dashboard)/billing/page.tsx:163` branch already falls through to "Price ID not configured", which hides the checkout button without any code change.
-- [ ] Verify `BillingActionButton action="portal"` (line 121) remains gated by `org.stripeCustomerId` — fine to leave since no beta org will have a customer ID in test mode.
+- [x] In Vercel production, leave `STRIPE_*_PRICE_ID` unset. Verified code path: `getPriceIdForPlan` (`lib/plan-limits.ts:32`) returns `undefined`, billing page falls through to the "Available after beta." fallback. (Dashboard step remains — must be set as unset in Vercel during §2.)
+- [x] Verified `BillingActionButton action="portal"` (`app/(dashboard)/billing/page.tsx:118`) is gated by `org.stripeCustomerId`. Beta orgs in test mode without a customer ID will not see it.
+- [x] Bonus: changed the no-priceId fallback copy from operator-style "Price ID not configured." to customer-facing "Available after beta." (`app/(dashboard)/billing/page.tsx:180`).
 - [ ] Document the manual escalation path for beta orgs that need >100/day. `/platform/orgs` is view-only; bumps are made by editing the org document directly in MongoDB Atlas:
     - Find the org document by `clerkOrgId` in the `organizations` collection.
     - Set `planName` to one of `"free" | "starter" | "growth" | "scale"`.
