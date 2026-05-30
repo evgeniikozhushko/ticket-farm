@@ -28,6 +28,12 @@ function hashRateLimitValue(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
+function getEffectiveRegistrationLimit(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) return null;
+  return value;
+}
+
 async function getClientIp(): Promise<string> {
   const requestHeaders = await headers();
   const forwardedFor = requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim();
@@ -115,6 +121,7 @@ export async function enterLottery(
     }
 
     const orgId = org.clerkOrgId;
+    const maxRegistrantsPerDay = getEffectiveRegistrationLimit(org.maxRegistrantsPerDay);
     const date = getTodayDateString(org.timezone);
     const lotteriesCollection = await getLotteriesCollection();
     const registrantsCollection = await getRegistrantsCollection();
@@ -166,11 +173,11 @@ export async function enterLottery(
             orgId,
             date,
             status: { $ne: "LOTTERY_DRAWN" },
-            ...(org.maxRegistrantsPerDay === null
+            ...(maxRegistrantsPerDay === null
               ? {}
               : {
                   $or: [
-                    { registrantCount: { $lt: org.maxRegistrantsPerDay } },
+                    { registrantCount: { $lt: maxRegistrantsPerDay } },
                     { registrantCount: { $exists: false } },
                   ],
                 }),

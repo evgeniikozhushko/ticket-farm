@@ -151,6 +151,47 @@ describe("public registration", () => {
     );
   });
 
+  it("treats legacy orgs missing maxRegistrantsPerDay as unlimited", async () => {
+    getOrgBySlugMock.mockResolvedValue({
+      clerkOrgId: "org_1",
+      timezone: "America/Edmonton",
+    });
+    const { enterLottery } = await loadAction();
+
+    await expect(enterLottery("farm", validForm())).resolves.toEqual({ success: true });
+
+    expect(lotteriesCollection.findOneAndUpdate).toHaveBeenCalledWith(
+      {
+        orgId: "org_1",
+        date: "2026-05-28",
+        status: { $ne: "LOTTERY_DRAWN" },
+      },
+      expect.any(Object),
+      { upsert: true, returnDocument: "after" }
+    );
+  });
+
+  it("treats legacy non-finite org limits as unlimited", async () => {
+    getOrgBySlugMock.mockResolvedValue({
+      clerkOrgId: "org_1",
+      timezone: "America/Edmonton",
+      maxRegistrantsPerDay: Infinity,
+    });
+    const { enterLottery } = await loadAction();
+
+    await expect(enterLottery("farm", validForm())).resolves.toEqual({ success: true });
+
+    expect(lotteriesCollection.findOneAndUpdate).toHaveBeenCalledWith(
+      {
+        orgId: "org_1",
+        date: "2026-05-28",
+        status: { $ne: "LOTTERY_DRAWN" },
+      },
+      expect.any(Object),
+      { upsert: true, returnDocument: "after" }
+    );
+  });
+
   it("rolls back quota on any insert failure", async () => {
     registrantsCollection.insertOne.mockRejectedValue(new Error("write failed"));
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
