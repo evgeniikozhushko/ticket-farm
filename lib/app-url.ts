@@ -16,5 +16,9 @@ export function getAppUrl(): string {
     throw new Error("APP_URL must use http or https.");
   }
 
+  if (process.env.NODE_ENV === "production" && parsed.protocol !== "https:") {
+    throw new Error("APP_URL must use https in production.");
+  }
+
   return appUrl.replace(/\/+$/, "");
 }
