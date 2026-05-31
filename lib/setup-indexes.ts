@@ -74,6 +74,13 @@ export async function setupIndexes() {
   );
   console.log("  tickets: { orgId, date, status, ticketNumber }");
 
+  // Defensive invariant: ticket numbers are unique within one org/day draw
+  await db.collection('tickets').createIndex(
+    { orgId: 1, date: 1, ticketNumber: 1 },
+    { unique: true, name: 'orgId_date_ticketNumber_unique_idx', background: true }
+  );
+  console.log("  tickets: { orgId, date, ticketNumber } unique");
+
   // Globally unique ticket ID (unchanged — ticketId is already globally unique)
   await db.collection('tickets').createIndex(
     { ticketId: 1 },
@@ -216,6 +223,12 @@ const REQUIRED_DEPLOY_INDEXES: RequiredIndex[] = [
     collection: 'registrants',
     name: 'orgId_name_email_idx',
     key: { orgId: 1, name: 1, email: 1 },
+  },
+  {
+    collection: 'tickets',
+    name: 'orgId_date_ticketNumber_unique_idx',
+    key: { orgId: 1, date: 1, ticketNumber: 1 },
+    unique: true,
   },
   {
     collection: 'processed_webhook_events',

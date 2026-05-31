@@ -18,7 +18,6 @@ import type { EmailTicket } from "@/lib/email";
 
 const TICKET_ID_LENGTH = 12;
 const TICKET_ID_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-const MAX_TICKET_ID_INSERT_ATTEMPTS = 5;
 
 function shuffleArray<T>(array: T[]): T[] {
   const shuffled = [...array];
@@ -165,27 +164,15 @@ export async function drawTodayLottery(
 
           selectedWinners = shuffleArray(registrants).slice(0, winnerCount);
           const winnerIds = selectedWinners.map((r) => r._id as ObjectId);
+          ticketDocuments = buildTicketDocuments({ orgId, selectedWinners, date, drawnAt });
 
-          for (let attempt = 0; attempt < MAX_TICKET_ID_INSERT_ATTEMPTS; attempt++) {
-            ticketDocuments = buildTicketDocuments({ orgId, selectedWinners, date, drawnAt });
-
-            try {
-              await ticketsCollection.insertMany(ticketDocuments, { session });
-              break;
-            } catch (err) {
-              if (
-                isTicketIdDuplicateKeyError(err) &&
-                attempt < MAX_TICKET_ID_INSERT_ATTEMPTS - 1
-              ) {
-                continue;
-              }
-
-              if (isTicketIdDuplicateKeyError(err)) {
-                throw new DrawUserError("Could not generate unique ticket IDs. Please try again.");
-              }
-
-              throw err;
+          try {
+            await ticketsCollection.insertMany(ticketDocuments, { session });
+          } catch (err) {
+            if (isTicketIdDuplicateKeyError(err)) {
+              throw new DrawUserError("Could not generate unique ticket IDs. Please try again.");
             }
+            throw err;
           }
 
           const emailTickets: EmailTicket[] = ticketDocuments.map((ticket) => ({
