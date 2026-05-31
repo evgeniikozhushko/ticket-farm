@@ -25,13 +25,18 @@ const slugSchema = z.string().transform((value, ctx) => {
   }
 });
 
+const SUPPORTED_TIMEZONES = new Set([
+  ...Intl.supportedValuesOf("timeZone"),
+  "UTC",
+]);
+
 function isValidTimezone(timezone: string): boolean {
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone: timezone });
-    return true;
-  } catch {
-    return false;
-  }
+  return SUPPORTED_TIMEZONES.has(timezone);
+}
+
+function isTicketFarmSender(email: string): boolean {
+  const domain = email.split("@").at(1);
+  return domain === "ticketfarm.ca";
 }
 
 // ---------------------------------------------------------------------------
@@ -129,12 +134,20 @@ export async function getOrganization(clerkOrgId: string): Promise<Organization 
 
 const orgSettingsSchema = z
   .object({
-    name: z.string().trim().min(1).optional(),
+    name: z.string().trim().min(1).max(120).optional(),
     slug: slugSchema.optional(),
     timezone: timezoneSchema.optional(),
     publicPageEnabled: z.boolean().optional(),
-    emailFromName: z.string().trim().min(1).optional(),
-    emailFromAddress: z.string().trim().email().transform((value) => value.toLowerCase()).optional(),
+    emailFromName: z.string().trim().min(1).max(120).optional(),
+    emailFromAddress: z
+      .string()
+      .trim()
+      .email()
+      .transform((value) => value.toLowerCase())
+      .refine(isTicketFarmSender, {
+        message: "Sender address must use the ticketfarm.ca domain.",
+      })
+      .optional(),
   })
   .strict();
 

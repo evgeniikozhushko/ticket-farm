@@ -30,6 +30,10 @@ export function parseOrgSlug(value: string): string {
     throw new Error("Slug is required.");
   }
 
+  if (slug.length < 3 || slug.length > 63) {
+    throw new Error("Slug must be between 3 and 63 characters.");
+  }
+
   if (!/^[a-z0-9-]+$/.test(slug)) {
     throw new Error("Slug may only contain lowercase letters, numbers, and hyphens.");
   }

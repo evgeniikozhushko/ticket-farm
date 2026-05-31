@@ -228,7 +228,7 @@ describe("updateOrganizationSettings", () => {
         timezone: " America/Vancouver ",
         publicPageEnabled: false,
         emailFromName: "  Ticket Desk  ",
-        emailFromAddress: " HELLO@EXAMPLE.COM ",
+        emailFromAddress: " HELLO@TICKETFARM.CA ",
       })
     ).resolves.toEqual({ success: true });
 
@@ -241,7 +241,7 @@ describe("updateOrganizationSettings", () => {
           timezone: "America/Vancouver",
           publicPageEnabled: false,
           emailFromName: "Ticket Desk",
-          emailFromAddress: "hello@example.com",
+          emailFromAddress: "hello@ticketfarm.ca",
           updatedAt: expect.any(Date),
         },
       }
@@ -250,10 +250,18 @@ describe("updateOrganizationSettings", () => {
     expect(invalidateOrgCacheMock).toHaveBeenCalledWith("new-farm");
   });
 
-  it("rejects empty and reserved slugs without writing", async () => {
+  it("rejects empty, too-short, too-long, and reserved slugs without writing", async () => {
     const { updateOrganizationSettings } = await loadActions();
 
     await expect(updateOrganizationSettings({ slug: "!!!" })).resolves.toEqual({
+      success: false,
+      error: "Invalid organization settings.",
+    });
+    await expect(updateOrganizationSettings({ slug: "ab" })).resolves.toEqual({
+      success: false,
+      error: "Invalid organization settings.",
+    });
+    await expect(updateOrganizationSettings({ slug: "a".repeat(64) })).resolves.toEqual({
       success: false,
       error: "Invalid organization settings.",
     });
@@ -264,6 +272,61 @@ describe("updateOrganizationSettings", () => {
 
     expect(organizationsCollection.updateOne).not.toHaveBeenCalled();
     expect(invalidateOrgCacheMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid timezones without writing", async () => {
+    const { updateOrganizationSettings } = await loadActions();
+
+    await expect(updateOrganizationSettings({ timezone: "Mars/Basecamp" })).resolves.toEqual({
+      success: false,
+      error: "Invalid organization settings.",
+    });
+
+    expect(organizationsCollection.updateOne).not.toHaveBeenCalled();
+  });
+
+  it("accepts UTC as a timezone", async () => {
+    const { updateOrganizationSettings } = await loadActions();
+
+    await expect(updateOrganizationSettings({ timezone: "UTC" })).resolves.toEqual({
+      success: true,
+    });
+
+    expect(organizationsCollection.updateOne).toHaveBeenCalledWith(
+      { clerkOrgId: "org_1" },
+      {
+        $set: {
+          timezone: "UTC",
+          updatedAt: expect.any(Date),
+        },
+      }
+    );
+  });
+
+  it("rejects non-boolean public page values without writing", async () => {
+    const { updateOrganizationSettings } = await loadActions();
+
+    await expect(updateOrganizationSettings({ publicPageEnabled: "false" })).resolves.toEqual({
+      success: false,
+      error: "Invalid organization settings.",
+    });
+
+    expect(organizationsCollection.updateOne).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid or unverified sender addresses without writing", async () => {
+    const { updateOrganizationSettings } = await loadActions();
+
+    await expect(updateOrganizationSettings({ emailFromAddress: "not-an-email" })).resolves.toEqual({
+      success: false,
+      error: "Invalid organization settings.",
+    });
+    await expect(updateOrganizationSettings({ emailFromAddress: "hello@example.com" })).resolves.toEqual({
+      success: false,
+      error: "Invalid organization settings.",
+    });
+
+    expect(organizationsCollection.updateOne).not.toHaveBeenCalled();
   });
 
   it("returns a friendly duplicate slug error", async () => {
