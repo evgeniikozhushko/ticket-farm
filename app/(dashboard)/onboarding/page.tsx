@@ -44,7 +44,6 @@ export default async function OnboardingPage() {
           </p>
         </div>
         <OnboardingForm
-          clerkOrgId={orgId}
           defaultSlug={orgSlug ?? ""}
         />
       </div>

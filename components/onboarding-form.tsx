@@ -22,10 +22,8 @@ const COMMON_TIMEZONES = [
 ];
 
 export function OnboardingForm({
-  clerkOrgId,
   defaultSlug,
 }: {
-  clerkOrgId: string;
   defaultSlug: string;
 }) {
   const router = useRouter();
@@ -41,7 +39,14 @@ export function OnboardingForm({
     setError("");
 
     try {
-      await createOrganization({ clerkOrgId, name, slug, timezone });
+      const result = await createOrganization({ name, slug, timezone });
+
+      if (!result.success) {
+        setError(result.error);
+        setIsLoading(false);
+        return;
+      }
+
       router.push("/dashboard/lottery");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create organization");
