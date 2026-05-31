@@ -38,6 +38,20 @@ export async function setupIndexes() {
   );
   console.log("  registrants: { orgId, date, enteredAt }");
 
+  // Participants page: grouped email pagination + first/last entry summaries
+  await db.collection('registrants').createIndex(
+    { orgId: 1, email: 1, enteredAt: 1 },
+    { name: 'orgId_email_enteredAt_idx', background: true }
+  );
+  console.log("  registrants: { orgId, email, enteredAt }");
+
+  // Participants page: org-scoped prefix search by participant name
+  await db.collection('registrants').createIndex(
+    { orgId: 1, name: 1, email: 1 },
+    { name: 'orgId_name_email_idx', background: true }
+  );
+  console.log("  registrants: { orgId, name, email }");
+
   // ============================================================
   // LOTTERIES — orgId-leading
   // ============================================================
@@ -193,6 +207,16 @@ type RequiredIndex = {
 };
 
 const REQUIRED_DEPLOY_INDEXES: RequiredIndex[] = [
+  {
+    collection: 'registrants',
+    name: 'orgId_email_enteredAt_idx',
+    key: { orgId: 1, email: 1, enteredAt: 1 },
+  },
+  {
+    collection: 'registrants',
+    name: 'orgId_name_email_idx',
+    key: { orgId: 1, name: 1, email: 1 },
+  },
   {
     collection: 'processed_webhook_events',
     name: 'stripeEventId_unique_idx',
