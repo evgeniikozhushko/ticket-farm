@@ -1,7 +1,11 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { getOrganization } from "@/lib/actions/org.actions";
+import { getPriceIdForPlan } from "@/lib/plan-limits";
 import { getStripe, getOrCreateStripeCustomer } from "@/lib/stripe";
+import type { PlanName } from "@/lib/types";
+
+const CHECKOUT_PLANS = new Set<PlanName>(["starter", "growth", "scale"]);
 
 export async function POST(req: NextRequest) {
   const { userId, orgId, orgRole } = await auth();
@@ -14,10 +18,16 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => ({}));
-  const { priceId } = body as { priceId?: string };
+  const { planName } = body as { planName?: unknown };
+
+  if (typeof planName !== "string" || !CHECKOUT_PLANS.has(planName as PlanName)) {
+    return NextResponse.json({ error: "Unknown billing plan" }, { status: 400 });
+  }
+
+  const priceId = getPriceIdForPlan(planName as PlanName);
 
   if (!priceId) {
-    return NextResponse.json({ error: "priceId is required" }, { status: 400 });
+    return NextResponse.json({ error: "Billing plan is not available" }, { status: 400 });
   }
 
   const org = await getOrganization(orgId);

@@ -161,7 +161,7 @@ export default async function BillingPage({
                       ) : priceId ? (
                         <BillingActionButton
                           action="checkout"
-                          priceId={priceId}
+                          planName={planName}
                           label={
                             PLAN_ORDER.indexOf(planName) >
                             PLAN_ORDER.indexOf(org.planName)

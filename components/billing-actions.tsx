@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import type { PlanName } from "@/lib/types";
 
 interface BillingActionsProps {
   stripeCustomerId?: string;
-  priceId?: string;
+  planName?: Exclude<PlanName, "free">;
   label: string;
   variant?: "default" | "outline" | "secondary";
   action: "checkout" | "portal";
@@ -13,7 +14,7 @@ interface BillingActionsProps {
 
 export function BillingActionButton({
   stripeCustomerId,
-  priceId,
+  planName,
   label,
   variant = "default",
   action,
@@ -31,7 +32,7 @@ export function BillingActionButton({
           ? "/api/billing/create-checkout"
           : "/api/billing/create-portal";
 
-      const body = action === "checkout" ? { priceId } : {};
+      const body = action === "checkout" ? { planName } : {};
 
       const res = await fetch(endpoint, {
         method: "POST",
