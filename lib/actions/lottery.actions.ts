@@ -24,8 +24,33 @@ const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 const PUBLIC_IP_REGISTRATION_LIMIT = 20;
 const PUBLIC_EMAIL_REGISTRATION_LIMIT = 5;
 
+type RateLimitConsumption = {
+  allowed: boolean;
+  consumed: boolean;
+  key: string;
+};
+
 function hashRateLimitValue(value: string): string {
   return createHash("sha256").update(value).digest("hex");
+}
+
+function getRateLimitWindowStart(date: Date): number {
+  return Math.floor(date.getTime() / RATE_LIMIT_WINDOW_MS) * RATE_LIMIT_WINDOW_MS;
+}
+
+function getRateLimitKey(input: {
+  orgId: string;
+  scope: "ip" | "email";
+  value: string;
+  windowStart: number;
+}): string {
+  return [
+    "public-registration",
+    input.orgId,
+    input.scope,
+    hashRateLimitValue(input.value),
+    input.windowStart,
+  ].join(":");
 }
 
 function getEffectiveRegistrationLimit(value: unknown): number | null {
@@ -50,17 +75,11 @@ async function consumeRegistrationRateLimit(input: {
   scope: "ip" | "email";
   value: string;
   limit: number;
-}): Promise<boolean> {
+}): Promise<RateLimitConsumption> {
   const now = new Date();
-  const windowStart = Math.floor(now.getTime() / RATE_LIMIT_WINDOW_MS) * RATE_LIMIT_WINDOW_MS;
+  const windowStart = getRateLimitWindowStart(now);
   const expiresAt = new Date(windowStart + RATE_LIMIT_WINDOW_MS);
-  const key = [
-    "public-registration",
-    input.orgId,
-    input.scope,
-    hashRateLimitValue(input.value),
-    windowStart,
-  ].join(":");
+  const key = getRateLimitKey({ ...input, windowStart });
 
   const collection = await getPublicRegistrationRateLimitsCollection();
 
@@ -79,7 +98,7 @@ async function consumeRegistrationRateLimit(input: {
       { upsert: true, returnDocument: "after" }
     );
 
-    return result !== null;
+    return { allowed: result !== null, consumed: result !== null, key };
   } catch (err) {
     if ((err as { code?: number }).code === 11000) {
       const retryResult = await collection.updateOne(
@@ -89,10 +108,39 @@ async function consumeRegistrationRateLimit(input: {
           $set: { updatedAt: now },
         }
       );
-      return retryResult.modifiedCount === 1;
+      return {
+        allowed: retryResult.modifiedCount === 1,
+        consumed: retryResult.modifiedCount === 1,
+        key,
+      };
     }
     throw err;
   }
+}
+
+async function rollbackRegistrationRateLimits(consumptions: RateLimitConsumption[]): Promise<void> {
+  const consumedKeys = consumptions
+    .filter((consumption) => consumption.consumed)
+    .map((consumption) => consumption.key);
+
+  if (consumedKeys.length === 0) {
+    return;
+  }
+
+  const collection = await getPublicRegistrationRateLimitsCollection();
+
+  await Promise.all(
+    consumedKeys.map(async (key) => {
+      try {
+        await collection.updateOne(
+          { key, count: { $gt: 0 } },
+          { $inc: { count: -1 }, $set: { updatedAt: new Date() } }
+        );
+      } catch (err) {
+        console.error("[rate-limit] rollback failed:", err);
+      }
+    })
+  );
 }
 
 export async function enterLottery(
@@ -125,27 +173,12 @@ export async function enterLottery(
     const date = getTodayDateString(org.timezone);
     const lotteriesCollection = await getLotteriesCollection();
     const registrantsCollection = await getRegistrantsCollection();
-    const ip = await getClientIp();
 
-    const [ipAllowed, emailAllowed] = await Promise.all([
-      consumeRegistrationRateLimit({
-        orgId,
-        scope: "ip",
-        value: ip,
-        limit: PUBLIC_IP_REGISTRATION_LIMIT,
-      }),
-      consumeRegistrationRateLimit({
-        orgId,
-        scope: "email",
-        value: email,
-        limit: PUBLIC_EMAIL_REGISTRATION_LIMIT,
-      }),
-    ]);
-
-    if (!ipAllowed || !emailAllowed) {
+    const existingRegistrant = await registrantsCollection.findOne({ orgId, email, date });
+    if (existingRegistrant) {
       return {
         success: false,
-        error: "Too many registration attempts. Please try again later.",
+        error: "You've already entered today's lottery. Please check back tomorrow.",
       };
     }
 
@@ -221,6 +254,35 @@ export async function enterLottery(
       };
     }
 
+    const ip = await getClientIp();
+    const rateLimitConsumptions = await Promise.all([
+      consumeRegistrationRateLimit({
+        orgId,
+        scope: "ip",
+        value: ip,
+        limit: PUBLIC_IP_REGISTRATION_LIMIT,
+      }),
+      consumeRegistrationRateLimit({
+        orgId,
+        scope: "email",
+        value: email,
+        limit: PUBLIC_EMAIL_REGISTRATION_LIMIT,
+      }),
+    ]);
+
+    if (rateLimitConsumptions.some((consumption) => !consumption.allowed)) {
+      await lotteriesCollection.updateOne(
+        { orgId, date },
+        { $inc: { registrantCount: -1 } }
+      );
+      await rollbackRegistrationRateLimits(rateLimitConsumptions);
+
+      return {
+        success: false,
+        error: "Too many registration attempts. Please try again later.",
+      };
+    }
+
     // -------------------------------------------------------------------------
     // Step 2: Insert the registrant. Roll back the quota slot on ANY failure
     // so registrantCount stays accurate as the single source of truth.
@@ -242,6 +304,7 @@ export async function enterLottery(
         { orgId, date },
         { $inc: { registrantCount: -1 } }
       );
+      await rollbackRegistrationRateLimits(rateLimitConsumptions);
 
       // E11000: already registered today
       if (
