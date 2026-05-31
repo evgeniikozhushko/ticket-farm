@@ -19,6 +19,8 @@ Set these on the Vercel project for the `production` environment.
 MONGODB_URI=<atlas prod connection string>
 MONGODB_DB_NAME=<atlas prod db name>
 
+APP_URL=https://ticketfarm.ca
+
 RESEND_API_KEY=<resend prod key, sender hello@ticketfarm.ca>
 
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=<clerk prod publishable>

@@ -50,6 +50,7 @@ describe("POST /api/billing/create-checkout", () => {
     });
     getOrCreateStripeCustomerMock.mockReset().mockResolvedValue("cus_123");
     checkoutCreateMock.mockReset().mockResolvedValue({ url: "https://stripe.test/session" });
+    process.env.APP_URL = "https://ticketfarm.test/";
     process.env.STRIPE_STARTER_PRICE_ID = "price_starter";
     process.env.STRIPE_GROWTH_PRICE_ID = "price_growth";
     process.env.STRIPE_SCALE_PRICE_ID = "price_scale";
@@ -85,7 +86,48 @@ describe("POST /api/billing/create-checkout", () => {
     expect(checkoutCreateMock).toHaveBeenCalledWith(
       expect.objectContaining({
         line_items: [{ price: "price_growth", quantity: 1 }],
+        success_url: "https://ticketfarm.test/billing?success=1",
+        cancel_url: "https://ticketfarm.test/billing",
       })
     );
+  });
+
+  it("ignores request Origin when building Stripe redirect URLs", async () => {
+    process.env.APP_URL = "https://ticketfarm.ca";
+    const { POST } = await import("@/app/api/billing/create-checkout/route");
+
+    const response = await POST(checkoutRequest({ planName: "growth" }));
+
+    expect(response.status).toBe(200);
+    expect(checkoutCreateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success_url: "https://ticketfarm.ca/billing?success=1",
+        cancel_url: "https://ticketfarm.ca/billing",
+      })
+    );
+  });
+
+  it("fails closed when APP_URL is missing", async () => {
+    delete process.env.APP_URL;
+    const { POST } = await import("@/app/api/billing/create-checkout/route");
+
+    const response = await POST(checkoutRequest({ planName: "growth" }));
+
+    await expect(response.json()).resolves.toEqual({ error: "Billing is not configured" });
+    expect(response.status).toBe(500);
+    expect(getOrCreateStripeCustomerMock).not.toHaveBeenCalled();
+    expect(checkoutCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when APP_URL is invalid", async () => {
+    process.env.APP_URL = "javascript:alert(1)";
+    const { POST } = await import("@/app/api/billing/create-checkout/route");
+
+    const response = await POST(checkoutRequest({ planName: "growth" }));
+
+    await expect(response.json()).resolves.toEqual({ error: "Billing is not configured" });
+    expect(response.status).toBe(500);
+    expect(getOrCreateStripeCustomerMock).not.toHaveBeenCalled();
+    expect(checkoutCreateMock).not.toHaveBeenCalled();
   });
 });

@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { getOrganization } from "@/lib/actions/org.actions";
+import { getAppUrl } from "@/lib/app-url";
 import { getPriceIdForPlan } from "@/lib/plan-limits";
 import { getStripe, getOrCreateStripeCustomer } from "@/lib/stripe";
 import type { PlanName } from "@/lib/types";
@@ -30,6 +31,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Billing plan is not available" }, { status: 400 });
   }
 
+  let appUrl: string;
+  try {
+    appUrl = getAppUrl();
+  } catch (err) {
+    console.error("[billing checkout] Invalid APP_URL configuration:", err);
+    return NextResponse.json({ error: "Billing is not configured" }, { status: 500 });
+  }
+
   const org = await getOrganization(orgId);
   if (!org) {
     return NextResponse.json({ error: "Organization not found" }, { status: 404 });
@@ -41,8 +50,6 @@ export async function POST(req: NextRequest) {
     org.emailFromAddress
   );
 
-  const origin = req.headers.get("origin") ?? "https://ticketfarm.ca";
-
   const stripe = getStripe();
   const session = await stripe.checkout.sessions.create({
     customer: stripeCustomerId,
@@ -53,8 +60,8 @@ export async function POST(req: NextRequest) {
     },
     mode: "subscription",
     line_items: [{ price: priceId, quantity: 1 }],
-    success_url: `${origin}/billing?success=1`,
-    cancel_url: `${origin}/billing`,
+    success_url: `${appUrl}/billing?success=1`,
+    cancel_url: `${appUrl}/billing`,
     allow_promotion_codes: true,
   });
 

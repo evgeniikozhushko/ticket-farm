@@ -1,9 +1,10 @@
 import { auth } from "@clerk/nextjs/server";
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getOrganization } from "@/lib/actions/org.actions";
+import { getAppUrl } from "@/lib/app-url";
 import { getStripe } from "@/lib/stripe";
 
-export async function POST(req: NextRequest) {
+export async function POST() {
   const { userId, orgId, orgRole } = await auth();
 
   if (!userId || !orgId) {
@@ -27,12 +28,18 @@ export async function POST(req: NextRequest) {
   // Note: The portal is intentionally accessible even on past_due / canceled —
   // blocking it would prevent admins from resolving payment issues.
 
-  const origin = req.headers.get("origin") ?? "https://ticketfarm.ca";
+  let appUrl: string;
+  try {
+    appUrl = getAppUrl();
+  } catch (err) {
+    console.error("[billing portal] Invalid APP_URL configuration:", err);
+    return NextResponse.json({ error: "Billing is not configured" }, { status: 500 });
+  }
 
   const stripe = getStripe();
   const session = await stripe.billingPortal.sessions.create({
     customer: org.stripeCustomerId,
-    return_url: `${origin}/billing`,
+    return_url: `${appUrl}/billing`,
   });
 
   return NextResponse.json({ url: session.url });
