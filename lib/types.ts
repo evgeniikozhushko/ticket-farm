@@ -67,7 +67,7 @@ export interface Ticket {
   _id?: ObjectId;
   orgId: string;        // Clerk org_xxx
   ticketNumber: number;
-  ticketId: string;     // Unique 6-digit ID
+  ticketId: string;     // Unique 12-character uppercase base36 ID
   name: string;
   email: string;
   date: string;         // "YYYY-MM-DD"

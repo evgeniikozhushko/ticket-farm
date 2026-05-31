@@ -1,7 +1,7 @@
 "use server";
 
 import { headers } from "next/headers";
-import { createHash } from "crypto";
+import { createHash, randomInt } from "crypto";
 import {
   getLotteriesCollection,
   getPublicRegistrationRateLimitsCollection,
@@ -235,8 +235,8 @@ export async function enterLottery(
           (err as { code?: number }).code === 11000 &&
           attempt < MAX_QUOTA_RETRIES - 1
         ) {
-          // Jittered backoff: 20–100 ms
-          await new Promise((r) => setTimeout(r, 20 + Math.random() * 80));
+          // Jittered backoff: 20–99 ms
+          await new Promise((r) => setTimeout(r, randomInt(20, 100)));
           continue;
         }
         if ((err as { code?: number }).code === 11000) {
