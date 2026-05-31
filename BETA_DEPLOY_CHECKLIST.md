@@ -2,7 +2,26 @@
 
 A short, action-only checklist for promoting the `production-beta` branch to
 `ticketfarm.ca`. The full plan lives in `tasks/todo.md`; this file is just the
-dashboard/CLI steps that can't be automated from the code.
+dashboard/CLI steps and final launch gates that can't be automated from the code.
+
+## 0. Code readiness gates
+
+These should be true before promoting a public beta build.
+
+- [ ] Font loading is production-safe: either self-host app fonts or confirm the
+      production build environment can reliably fetch Google Fonts.
+- [ ] Run `pnpm lint`.
+- [ ] Run `pnpm exec tsc --noEmit`.
+- [ ] Run `pnpm test`.
+- [ ] Confirm the participant history page still uses database aggregation and
+      pagination, not full org-wide in-memory scans.
+- [ ] Confirm checkout remains server-side plan based: clients send `planName`,
+      the server resolves Stripe price IDs, and redirects use `APP_URL`, not
+      request `Origin`.
+- [ ] Confirm org onboarding and org settings still derive organization identity
+      from Clerk server auth and reject unknown/mass-assignment fields.
+- [ ] Confirm lottery draw still uses crypto-grade randomness and retries
+      duplicate `ticketId` collisions.
 
 ## 1. MongoDB Atlas
 
@@ -10,6 +29,11 @@ dashboard/CLI steps that can't be automated from the code.
 - [ ] Note the connection string and DB name.
 - [ ] Locally, with `MONGODB_URI` and `MONGODB_DB_NAME` pointed at production,
       run `pnpm setup-db` once to create indexes.
+- [ ] Confirm `pnpm setup-db` prints "Required deploy indexes verified."
+- [ ] In Atlas, confirm these required index groups exist:
+      `registrants`, `tickets`, `lotteries`, `organizations`,
+      `processed_webhook_events`, `email_dispatches`, and
+      `public_registration_rate_limits`.
 
 ## 2. Vercel production env vars
 
@@ -65,6 +89,8 @@ creation stays owned by the in-app onboarding flow.
 - [ ] Push `production-beta` (already done if you're reading this on GitHub).
 - [ ] Confirm Vercel builds the preview cleanly.
 - [ ] Run the manual smoke (§5) against the preview URL.
+- [ ] Check Vercel function logs during smoke; there should be no unhandled
+      errors from MongoDB, Clerk, Stripe, Resend, or Inngest.
 - [ ] Promote the preview to production after the smoke passes.
 
 ## 5. Manual smoke test
@@ -79,9 +105,11 @@ Run against the Vercel preview URL.
 - [ ] `/winners`, org settings, `/billing` (no checkout buttons visible, free
       tier shows "Available after beta." on paid cards), and `/platform`
       access (admin only) all render.
+- [ ] `/dashboard/participants` renders and search/pagination work on the test
+      org without loading every historical registrant into the browser.
 - [ ] Stripe webhook endpoint returns 200 on a test-mode event.
 - [ ] Atlas escalation dry-run: pick one beta test org, bump
-      `maxRegistrantsPerDay` from 100 → 250 directly in Atlas, wait up to 5
+      `maxRegistrantsPerDay` from 100 to 250 directly in Atlas, wait up to 5
       min for the org-slug cache TTL, verify public registration accepts the
       101st entry that day, then reset the org.
 - [ ] Production logs show no unhandled errors during smoke path.
