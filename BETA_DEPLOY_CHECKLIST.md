@@ -20,8 +20,11 @@ These should be true before promoting a public beta build.
       request `Origin`.
 - [ ] Confirm org onboarding and org settings still derive organization identity
       from Clerk server auth and reject unknown/mass-assignment fields.
-- [ ] Confirm lottery draw still uses crypto-grade randomness and retries
-      duplicate `ticketId` collisions.
+- [ ] Confirm sender email settings remain restricted to the verified
+      `ticketfarm.ca` sender domain; custom org sender domains are out of scope
+      for beta.
+- [ ] Confirm lottery draw still uses crypto-grade randomness and aborts safely
+      on duplicate `ticketId` collisions.
 
 ## 1. MongoDB Atlas
 

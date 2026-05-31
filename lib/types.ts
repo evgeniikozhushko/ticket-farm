@@ -15,7 +15,7 @@ export interface Organization {
   timezone: string;             // IANA timezone string (e.g. "America/Edmonton")
   publicPageEnabled: boolean;
   emailFromName: string;
-  emailFromAddress: string;     // Resend verified sender address
+  emailFromAddress: string;     // Beta: verified ticketfarm.ca sender address
   stripeCustomerId?: string;
   stripePriceId?: string;
   subscriptionStatus: SubscriptionStatus;
