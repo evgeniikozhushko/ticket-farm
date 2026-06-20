@@ -123,7 +123,7 @@ ticket-farm/
 ├── scripts/
 │   ├── setup-db.ts                     # Run indexes (npm run setup-db)
 │   └── migrate-add-orgid.ts           # Phase 2 backfill (SEED_ORG_ID=xxx)
-└── middleware.ts                       # Clerk route protection
+└── proxy.ts                            # Clerk route protection (Next 16: renamed from middleware.ts)
 ```
 
 ---

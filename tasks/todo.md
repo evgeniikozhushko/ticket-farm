@@ -93,7 +93,23 @@ Code-side beta-readiness work is complete:
 - **Trust pages:** Home eyebrow/footer, About, Privacy, Terms all landed.
 - **Env audit:** `.env.example` reconciled against every `process.env.*` reference.
 - **Atlas runbook:** documented in `BETA_DEPLOY_CHECKLIST.md` §6.
-- **Automated gates green:** `pnpm lint` clean, 72/72 tests pass, `pnpm build` produces 15 routes with `Proxy (Middleware)`.
+
+### BETA_DEPLOY_CHECKLIST §0 — code-readiness gates (verified 2026-06-19)
+
+All seven gates pass:
+
+| Gate | Evidence |
+| --- | --- |
+| `pnpm lint` | Clean. |
+| `pnpm exec tsc --noEmit` | No errors. |
+| `pnpm test` | 15 files / 72 tests pass. |
+| `pnpm build` | Compile 2.0s, TS 2.5s, 15 routes, `Proxy (Middleware)` confirmed. |
+| Font loading prod-safe | `app/layout.tsx` uses `next/font/google` (Geist + Geist_Mono), build-time self-hosted. |
+| Participant history uses DB aggregation + pagination | `lib/actions/participants.actions.ts:39` — `$match`/`$group`/`$lookup` pipeline, cursor by `email: { $gt: cursor }`, `$limit: limit + 1`. |
+| Checkout server-side plan-based | `app/api/billing/create-checkout/route.ts` — client sends `planName`, server `getPriceIdForPlan`, redirects use `getAppUrl()` (not request `Origin`), admin gate + plan allowlist. |
+| Org onboarding rejects mass-assignment | `lib/actions/org.actions.ts:50` — `createOrganizationSchema` accepts only `name`/`slug`/`timezone`; `orgSettingsSchema` (line 135) uses `.strict()`. `clerkOrgId`, `planName`, `subscriptionStatus`, `stripeCustomerId` are server-only. |
+| Sender restricted to `ticketfarm.ca` | `lib/actions/org.actions.ts:37` — `isTicketFarmSender` refines `emailFromAddress` on update; default is `hello@ticketfarm.ca`. |
+| Lottery draw uses crypto-grade randomness | `lib/actions/lottery-draw.actions.ts:3` — `randomInt` from `crypto`; Fisher-Yates shuffle; duplicate `ticketId` aborts via `DrawUserError`. |
 
 Remaining work is all dashboard-driven and must be performed in Vercel/Atlas/Clerk/Stripe consoles:
 
