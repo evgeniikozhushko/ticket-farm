@@ -38,12 +38,7 @@ that need more than the free 100/day limit granted manually by a platform admin.
 - [x] In Vercel production, leave `STRIPE_*_PRICE_ID` unset. Verified code path: `getPriceIdForPlan` (`lib/plan-limits.ts:32`) returns `undefined`, billing page falls through to the "Available after beta." fallback. (Dashboard step remains — must be set as unset in Vercel during §2.)
 - [x] Verified `BillingActionButton action="portal"` (`app/(dashboard)/billing/page.tsx:118`) is gated by `org.stripeCustomerId`. Beta orgs in test mode without a customer ID will not see it.
 - [x] Bonus: changed the no-priceId fallback copy from operator-style "Price ID not configured." to customer-facing "Available after beta." (`app/(dashboard)/billing/page.tsx:180`).
-- [ ] Document the manual escalation path for beta orgs that need >100/day. `/platform/orgs` is view-only; bumps are made by editing the org document directly in MongoDB Atlas:
-    - Find the org document by `clerkOrgId` in the `organizations` collection.
-    - Set `planName` to one of `"free" | "starter" | "growth" | "scale"`.
-    - Set `maxRegistrantsPerDay` to an integer, or `null` for unlimited.
-    - Set `updatedAt` to the current `Date`.
-    - Do not touch `subscriptionStatus` or `stripeCustomerId`; those remain Stripe-owned.
+- [x] Document the manual escalation path for beta orgs that need >100/day. Landed in `BETA_DEPLOY_CHECKLIST.md` §6 (lines 120–132). Operator note covers `clerkOrgId` lookup, `planName` / `maxRegistrantsPerDay` / `updatedAt` fields, and explicit "do not touch" guard on `subscriptionStatus` and `stripeCustomerId`.
 
 ### 4. Public trust pages (concrete checklist, no design pass)
 - [x] Home (`app/page.tsx`): added "· Private Beta" to the eyebrow line and a footer row with Privacy / Terms / hello@ticketfarm.ca links. Hero copy and primary CTA preserved.
@@ -55,9 +50,9 @@ that need more than the free 100/day limit granted manually by a platform admin.
 ## Test plan
 
 ### Automated gates (must pass before deploy)
-- [ ] `pnpm lint`
-- [ ] `pnpm test`
-- [ ] `pnpm build`
+- [x] `pnpm lint` — clean (one advisory: baseline-browser-mapping data >2 months old, non-blocking).
+- [x] `pnpm test` — 15 files, 72 tests, all pass (540ms).
+- [x] `pnpm build` — compile 2.0s, TS 2.5s, 15 routes generated, `Proxy (Middleware)` confirmed.
 
 ### Test updates
 - [x] Update `tests/middleware.test.ts` to import and exercise `proxy.ts` post-migration. Done — 4 `@/middleware` import paths swapped to `@/proxy`; existing mocks carried over unchanged. All 4 cases still pass.
@@ -91,4 +86,18 @@ that need more than the free 100/day limit granted manually by a platform admin.
 
 ## Review
 
-_To be filled in after execution._
+Code-side beta-readiness work is complete:
+
+- **Blockers cleared:** lint (`scripts/ensure-next-dev-manifests.cjs` ignored), build (stale `.next` was the cause), Next 16 `middleware.ts` → `proxy.ts` migration.
+- **Billing:** `STRIPE_*_PRICE_ID` left unset; fallback copy switched to customer-facing "Available after beta."
+- **Trust pages:** Home eyebrow/footer, About, Privacy, Terms all landed.
+- **Env audit:** `.env.example` reconciled against every `process.env.*` reference.
+- **Atlas runbook:** documented in `BETA_DEPLOY_CHECKLIST.md` §6.
+- **Automated gates green:** `pnpm lint` clean, 72/72 tests pass, `pnpm build` produces 15 routes with `Proxy (Middleware)`.
+
+Remaining work is all dashboard-driven and must be performed in Vercel/Atlas/Clerk/Stripe consoles:
+
+1. Provision prod MongoDB; run `pnpm setup-db` against prod env.
+2. Set Vercel prod env vars (block in `BETA_DEPLOY_CHECKLIST.md` §2).
+3. Wire `ticketfarm.ca` in Vercel + Clerk allowed URLs.
+4. Deploy to preview, run manual smoke (§5), promote.
