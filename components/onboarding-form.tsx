@@ -23,8 +23,10 @@ const COMMON_TIMEZONES = [
 
 export function OnboardingForm({
   defaultSlug,
+  initialError,
 }: {
   defaultSlug: string;
+  initialError?: string;
 }) {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -32,6 +34,8 @@ export function OnboardingForm({
   const [timezone, setTimezone] = useState("America/Edmonton");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const displayedError = error || initialError;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,8 +99,8 @@ export function OnboardingForm({
         </select>
       </div>
 
-      {error && (
-        <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
+      {displayedError && (
+        <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{displayedError}</div>
       )}
 
       <Button type="submit" className="w-full" disabled={isLoading}>

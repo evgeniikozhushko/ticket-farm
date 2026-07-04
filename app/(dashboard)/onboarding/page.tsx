@@ -1,15 +1,16 @@
 import { CreateOrganization } from "@clerk/nextjs";
-import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { getOrganization } from "@/lib/actions/org.actions";
+import { ensureOrganizationDocument } from "@/lib/org-setup";
 import { OnboardingForm } from "@/components/onboarding-form";
 
 export default async function OnboardingPage() {
-  const { userId, orgId, orgSlug } = await auth();
+  const result = await ensureOrganizationDocument();
 
-  if (!userId) redirect("/sign-in");
+  if (result.status === "ok") {
+    redirect("/dashboard/lottery");
+  }
 
-  if (!orgId) {
+  if (result.status === "needs-clerk-org") {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
         <div className="w-full max-w-md space-y-6 text-center">
@@ -30,10 +31,6 @@ export default async function OnboardingPage() {
     );
   }
 
-  // If org document already exists, skip onboarding
-  const existing = await getOrganization(orgId);
-  if (existing) redirect("/dashboard/lottery");
-
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
       <div className="w-full max-w-md space-y-8">
@@ -44,7 +41,8 @@ export default async function OnboardingPage() {
           </p>
         </div>
         <OnboardingForm
-          defaultSlug={orgSlug ?? ""}
+          defaultSlug={result.defaultSlug}
+          initialError={result.error}
         />
       </div>
     </main>
