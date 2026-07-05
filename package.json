@@ -11,7 +11,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "setup-db": "node --import tsx scripts/setup-db.ts"
+    "setup-db": "node --import tsx scripts/setup-db.ts",
+    "check-db": "node --import tsx scripts/check-db-connection.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.37.3",

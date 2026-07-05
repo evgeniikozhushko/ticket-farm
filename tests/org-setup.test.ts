@@ -156,17 +156,30 @@ describe("ensureOrganizationDocument", () => {
     });
   });
 
-  it("falls back to needs-clerk-org when Clerk org fetch fails", async () => {
+  it("returns needs-clerk-org when Clerk reports the org was not found", async () => {
     authMock.mockResolvedValue({ userId: "user_1", orgId: "org_stale" });
     organizationsCollection.findOne.mockResolvedValue(null);
-    getClerkOrganizationMock.mockRejectedValue(new Error("Not Found"));
-    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    getClerkOrganizationMock.mockRejectedValue({
+      status: 404,
+      errors: [{ code: "resource_not_found" }],
+    });
+    const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const { ensureOrganizationDocument } = await import("@/lib/org-setup");
 
     await expect(ensureOrganizationDocument()).resolves.toEqual({ status: "needs-clerk-org" });
     expect(createOrganizationMock).not.toHaveBeenCalled();
-    expect(consoleErrorSpy).toHaveBeenCalled();
-    consoleErrorSpy.mockRestore();
+    expect(consoleWarnSpy).toHaveBeenCalled();
+    consoleWarnSpy.mockRestore();
+  });
+
+  it("propagates other Clerk fetch errors", async () => {
+    authMock.mockResolvedValue({ userId: "user_1", orgId: "org_1" });
+    organizationsCollection.findOne.mockResolvedValue(null);
+    getClerkOrganizationMock.mockRejectedValue(new Error("Clerk API outage"));
+    const { ensureOrganizationDocument } = await import("@/lib/org-setup");
+
+    await expect(ensureOrganizationDocument()).rejects.toThrow("Clerk API outage");
+    expect(createOrganizationMock).not.toHaveBeenCalled();
   });
 
   it("redirects unauthenticated callers to /sign-in", async () => {
