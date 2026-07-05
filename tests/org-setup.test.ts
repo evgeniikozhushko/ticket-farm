@@ -156,6 +156,19 @@ describe("ensureOrganizationDocument", () => {
     });
   });
 
+  it("falls back to needs-clerk-org when Clerk org fetch fails", async () => {
+    authMock.mockResolvedValue({ userId: "user_1", orgId: "org_stale" });
+    organizationsCollection.findOne.mockResolvedValue(null);
+    getClerkOrganizationMock.mockRejectedValue(new Error("Not Found"));
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { ensureOrganizationDocument } = await import("@/lib/org-setup");
+
+    await expect(ensureOrganizationDocument()).resolves.toEqual({ status: "needs-clerk-org" });
+    expect(createOrganizationMock).not.toHaveBeenCalled();
+    expect(consoleErrorSpy).toHaveBeenCalled();
+    consoleErrorSpy.mockRestore();
+  });
+
   it("redirects unauthenticated callers to /sign-in", async () => {
     authMock.mockResolvedValue({ userId: null, orgId: null });
     const { ensureOrganizationDocument } = await import("@/lib/org-setup");

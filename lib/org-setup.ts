@@ -64,8 +64,14 @@ export async function ensureOrganizationDocument(): Promise<EnsureOrganizationRe
     return { status: "ok" };
   }
 
-  const client = await clerkClient();
-  const clerkOrg = await client.organizations.getOrganization({ organizationId: orgId });
+  let clerkOrg;
+  try {
+    const client = await clerkClient();
+    clerkOrg = await client.organizations.getOrganization({ organizationId: orgId });
+  } catch (err) {
+    console.error("[ensureOrganizationDocument] Clerk org fetch failed", { orgId, err });
+    return { status: "needs-clerk-org" };
+  }
 
   const fallbackSlug = clerkOrg.slug || normalizeOrgSlug(clerkOrg.name);
 
