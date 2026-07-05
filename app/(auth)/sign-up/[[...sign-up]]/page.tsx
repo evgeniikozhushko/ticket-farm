@@ -6,7 +6,7 @@ import { getAuthenticatedOrgHomePath } from "@/lib/org-setup";
 export default async function SignUpPage() {
   const { userId, orgId } = await auth();
 
-  if (userId) {
+  if (userId && orgId) {
     redirect(await getAuthenticatedOrgHomePath(orgId));
   }
 
