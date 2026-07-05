@@ -38,6 +38,20 @@ export async function setupIndexes() {
   );
   console.log("  registrants: { orgId, date, enteredAt }");
 
+  // Participants page: grouped email pagination + first/last entry summaries
+  await db.collection('registrants').createIndex(
+    { orgId: 1, email: 1, enteredAt: 1 },
+    { name: 'orgId_email_enteredAt_idx', background: true }
+  );
+  console.log("  registrants: { orgId, email, enteredAt }");
+
+  // Participants page: org-scoped prefix search by participant name
+  await db.collection('registrants').createIndex(
+    { orgId: 1, name: 1, email: 1 },
+    { name: 'orgId_name_email_idx', background: true }
+  );
+  console.log("  registrants: { orgId, name, email }");
+
   // ============================================================
   // LOTTERIES — orgId-leading
   // ============================================================
@@ -59,6 +73,13 @@ export async function setupIndexes() {
     { name: 'orgId_winners_page_idx', background: true }
   );
   console.log("  tickets: { orgId, date, status, ticketNumber }");
+
+  // Defensive invariant: ticket numbers are unique within one org/day draw
+  await db.collection('tickets').createIndex(
+    { orgId: 1, date: 1, ticketNumber: 1 },
+    { unique: true, name: 'orgId_date_ticketNumber_unique_idx', background: true }
+  );
+  console.log("  tickets: { orgId, date, ticketNumber } unique");
 
   // Globally unique ticket ID (unchanged — ticketId is already globally unique)
   await db.collection('tickets').createIndex(
@@ -193,6 +214,22 @@ type RequiredIndex = {
 };
 
 const REQUIRED_DEPLOY_INDEXES: RequiredIndex[] = [
+  {
+    collection: 'registrants',
+    name: 'orgId_email_enteredAt_idx',
+    key: { orgId: 1, email: 1, enteredAt: 1 },
+  },
+  {
+    collection: 'registrants',
+    name: 'orgId_name_email_idx',
+    key: { orgId: 1, name: 1, email: 1 },
+  },
+  {
+    collection: 'tickets',
+    name: 'orgId_date_ticketNumber_unique_idx',
+    key: { orgId: 1, date: 1, ticketNumber: 1 },
+    unique: true,
+  },
   {
     collection: 'processed_webhook_events',
     name: 'stripeEventId_unique_idx',

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const requireRoleMock = vi.hoisted(() => vi.fn());
 const registrantsCollection = vi.hoisted(() => ({
+  aggregate: vi.fn(),
   find: vi.fn(),
 }));
 const ticketsCollection = vi.hoisted(() => ({
@@ -84,6 +85,7 @@ async function loadAction() {
 describe("participants actions", () => {
   beforeEach(() => {
     requireRoleMock.mockReset();
+    registrantsCollection.aggregate.mockReset();
     registrantsCollection.find.mockReset();
     ticketsCollection.find.mockReset();
 
@@ -107,14 +109,47 @@ describe("participants actions", () => {
   });
 
   it("groups participant summaries by email within the active org only", async () => {
+    const participantRows = [
+      {
+        orgId: "org_1",
+        email: "ada@example.com",
+        latestName: "Ada Lovelace",
+        firstEnteredAt: new Date("2026-05-28T10:00:00Z"),
+        lastEnteredAt: new Date("2026-05-29T10:00:00Z"),
+        entryCount: 2,
+        winCount: 1,
+        activeTicketCount: 1,
+        checkedInTicketCount: 0,
+      },
+    ];
+    registrantsCollection.aggregate.mockReturnValue({
+      toArray: vi.fn(() => Promise.resolve(participantRows)),
+    });
     const { listOrgParticipants } = await loadAction();
 
-    const rows = await listOrgParticipants({ limit: 20 });
+    const result = await listOrgParticipants({ limit: 20 });
 
-    expect(registrantsCollection.find).toHaveBeenCalledWith({ orgId: "org_1" });
-    expect(ticketsCollection.find).toHaveBeenCalledWith({ orgId: "org_1" });
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({
+    const pipeline = registrantsCollection.aggregate.mock.calls[0][0];
+    expect(pipeline[0]).toEqual({ $match: { orgId: "org_1" } });
+    expect(pipeline).toContainEqual({ $limit: 21 });
+    expect(pipeline).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          $group: expect.objectContaining({
+            _id: "$participantEmail",
+            entryCount: { $sum: 1 },
+          }),
+        }),
+        expect.objectContaining({
+          $lookup: expect.objectContaining({
+            from: "tickets",
+          }),
+        }),
+      ])
+    );
+    expect(ticketsCollection.find).not.toHaveBeenCalled();
+    expect(result).toEqual({ participants: participantRows, nextCursor: undefined });
+    expect(result.participants[0]).toMatchObject({
       orgId: "org_1",
       email: "ada@example.com",
       latestName: "Ada Lovelace",
@@ -123,6 +158,59 @@ describe("participants actions", () => {
       activeTicketCount: 1,
       checkedInTicketCount: 0,
     });
+  });
+
+  it("applies prefix search, cursor, and limit inside the aggregation", async () => {
+    const participantRows = [
+      {
+        orgId: "org_1",
+        email: "babbage@example.com",
+        latestName: "Charles Babbage",
+        firstEnteredAt: new Date("2026-05-28T10:00:00Z"),
+        lastEnteredAt: new Date("2026-05-28T10:00:00Z"),
+        entryCount: 1,
+        winCount: 0,
+        activeTicketCount: 0,
+        checkedInTicketCount: 0,
+      },
+      {
+        orgId: "org_1",
+        email: "bell@example.com",
+        latestName: "Alexander Bell",
+        firstEnteredAt: new Date("2026-05-29T10:00:00Z"),
+        lastEnteredAt: new Date("2026-05-29T10:00:00Z"),
+        entryCount: 1,
+        winCount: 0,
+        activeTicketCount: 0,
+        checkedInTicketCount: 0,
+      },
+    ];
+    registrantsCollection.aggregate.mockReturnValue({
+      toArray: vi.fn(() => Promise.resolve(participantRows)),
+    });
+    const { listOrgParticipants } = await loadAction();
+
+    const result = await listOrgParticipants({
+      search: "ba",
+      cursor: "ada@example.com",
+      limit: 1,
+    });
+
+    const pipeline = registrantsCollection.aggregate.mock.calls[0][0];
+    expect(pipeline[0]).toEqual({ $match: { orgId: "org_1" } });
+    expect(pipeline).toContainEqual({
+      $match: {
+        email: { $gt: "ada@example.com" },
+        $or: expect.arrayContaining([
+          { email: { $regex: "^ba" } },
+          { latestName: { $regex: "^ba" } },
+          { latestName: { $regex: "^Ba" } },
+        ]),
+      },
+    });
+    expect(pipeline).toContainEqual({ $limit: 2 });
+    expect(result.participants).toEqual([participantRows[0]]);
+    expect(result.nextCursor).toBe("babbage@example.com");
   });
 
   it("returns participant history scoped by normalized email and active org", async () => {

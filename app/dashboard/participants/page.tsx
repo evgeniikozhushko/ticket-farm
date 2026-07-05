@@ -31,13 +31,14 @@ function formatDate(date: Date): string {
 export default async function ParticipantsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; email?: string }>;
+  searchParams: Promise<{ q?: string; email?: string; cursor?: string }>;
 }) {
-  const { q = "", email } = await searchParams;
-  const [participants, history] = await Promise.all([
-    listOrgParticipants({ search: q, limit: 100 }),
+  const { q = "", email, cursor } = await searchParams;
+  const [participantPage, history] = await Promise.all([
+    listOrgParticipants({ search: q, cursor, limit: 100 }),
     email ? getParticipantHistory(email) : Promise.resolve([]),
   ]);
+  const { participants, nextCursor } = participantPage;
 
   return (
     <SidebarProvider
@@ -133,6 +134,24 @@ export default async function ParticipantsPage({
                     </TableBody>
                   </Table>
                 </div>
+                {nextCursor && (
+                  <div className="mt-4 flex justify-end">
+                    <Button asChild variant="outline">
+                      <Link
+                        href={{
+                          pathname: "/dashboard/participants",
+                          query: {
+                            ...(q ? { q } : {}),
+                            ...(email ? { email } : {}),
+                            cursor: nextCursor,
+                          },
+                        }}
+                      >
+                        Next
+                      </Link>
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
 

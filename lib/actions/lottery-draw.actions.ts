@@ -1,5 +1,6 @@
 "use server";
 
+import { randomInt } from "crypto";
 import { ObjectId } from "mongodb";
 import {
   getClient,
@@ -15,23 +16,91 @@ import { getOrganization } from "@/lib/actions/org.actions";
 import { dispatchWinnerEmailEvent } from "@/lib/email-dispatch-outbox";
 import type { EmailTicket } from "@/lib/email";
 
+const TICKET_ID_LENGTH = 12;
+const TICKET_ID_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
 function shuffleArray<T>(array: T[]): T[] {
   const shuffled = [...array];
   for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = randomInt(i + 1);
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
   return shuffled;
 }
 
 function generateTicketId(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return Array.from({ length: TICKET_ID_LENGTH }, () =>
+    TICKET_ID_ALPHABET[randomInt(TICKET_ID_ALPHABET.length)]
+  ).join("");
 }
 
 class DrawUserError extends Error {}
 
 function isDuplicateKeyError(err: unknown): boolean {
   return typeof err === "object" && err !== null && "code" in err && (err as { code: number }).code === 11000;
+}
+
+function duplicateErrorIncludesField(err: unknown, field: string): boolean {
+  if (!err || typeof err !== "object") return false;
+
+  const error = err as {
+    keyPattern?: Record<string, unknown>;
+    keyValue?: Record<string, unknown>;
+    index?: string;
+    message?: string;
+    writeErrors?: Array<{
+      err?: {
+        keyPattern?: Record<string, unknown>;
+        keyValue?: Record<string, unknown>;
+        index?: string;
+        errmsg?: string;
+      };
+      keyPattern?: Record<string, unknown>;
+      keyValue?: Record<string, unknown>;
+      index?: string;
+      errmsg?: string;
+    }>;
+  };
+
+  if (error.keyPattern && field in error.keyPattern) return true;
+  if (error.keyValue && field in error.keyValue) return true;
+  if (error.index?.includes(field)) return true;
+  if (error.message?.includes(field)) return true;
+
+  return Boolean(
+    error.writeErrors?.some((writeError) => {
+      const nested = writeError.err ?? writeError;
+      return (
+        Boolean(nested.keyPattern && field in nested.keyPattern) ||
+        Boolean(nested.keyValue && field in nested.keyValue) ||
+        Boolean(nested.index?.includes(field)) ||
+        Boolean(nested.errmsg?.includes(field))
+      );
+    })
+  );
+}
+
+function isTicketIdDuplicateKeyError(err: unknown): boolean {
+  return isDuplicateKeyError(err) && duplicateErrorIncludesField(err, "ticketId");
+}
+
+function buildTicketDocuments(input: {
+  orgId: string;
+  selectedWinners: Registrant[];
+  date: string;
+  drawnAt: Date;
+}): Omit<Ticket, "_id">[] {
+  return input.selectedWinners.map((winner, index) => ({
+    orgId: input.orgId,
+    ticketNumber: index + 1,
+    ticketId: generateTicketId(),
+    name: winner.name,
+    email: winner.email,
+    date: input.date,
+    pickupTime: "5:30 PM",
+    status: "ACTIVE",
+    generatedAt: input.drawnAt,
+  }));
 }
 
 export async function drawTodayLottery(
@@ -95,20 +164,16 @@ export async function drawTodayLottery(
 
           selectedWinners = shuffleArray(registrants).slice(0, winnerCount);
           const winnerIds = selectedWinners.map((r) => r._id as ObjectId);
+          ticketDocuments = buildTicketDocuments({ orgId, selectedWinners, date, drawnAt });
 
-          ticketDocuments = selectedWinners.map((winner, index) => ({
-            orgId,
-            ticketNumber: index + 1,
-            ticketId: generateTicketId(),
-            name: winner.name,
-            email: winner.email,
-            date,
-            pickupTime: "5:30 PM",
-            status: "ACTIVE",
-            generatedAt: drawnAt,
-          }));
-
-          await ticketsCollection.insertMany(ticketDocuments, { session });
+          try {
+            await ticketsCollection.insertMany(ticketDocuments, { session });
+          } catch (err) {
+            if (isTicketIdDuplicateKeyError(err)) {
+              throw new DrawUserError("Could not generate unique ticket IDs. Please try again.");
+            }
+            throw err;
+          }
 
           const emailTickets: EmailTicket[] = ticketDocuments.map((ticket) => ({
             name: ticket.name,

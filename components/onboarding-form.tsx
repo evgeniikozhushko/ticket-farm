@@ -22,11 +22,11 @@ const COMMON_TIMEZONES = [
 ];
 
 export function OnboardingForm({
-  clerkOrgId,
   defaultSlug,
+  initialError,
 }: {
-  clerkOrgId: string;
   defaultSlug: string;
+  initialError?: string;
 }) {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -35,13 +35,22 @@ export function OnboardingForm({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const displayedError = error || initialError;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError("");
 
     try {
-      await createOrganization({ clerkOrgId, name, slug, timezone });
+      const result = await createOrganization({ name, slug, timezone });
+
+      if (!result.success) {
+        setError(result.error);
+        setIsLoading(false);
+        return;
+      }
+
       router.push("/dashboard/lottery");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create organization");
@@ -90,8 +99,8 @@ export function OnboardingForm({
         </select>
       </div>
 
-      {error && (
-        <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
+      {displayedError && (
+        <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{displayedError}</div>
       )}
 
       <Button type="submit" className="w-full" disabled={isLoading}>

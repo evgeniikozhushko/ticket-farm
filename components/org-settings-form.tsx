@@ -166,7 +166,7 @@ export function OrgSettingsForm({ org }: { org: OrgSettingsFormOrg }) {
             placeholder="hello@example.com"
           />
           <p className="text-xs text-muted-foreground">
-            Must be a verified sender address in Resend.
+            Must use the verified ticketfarm.ca sender domain.
           </p>
         </div>
       </div>

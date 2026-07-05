@@ -15,7 +15,7 @@ export interface Organization {
   timezone: string;             // IANA timezone string (e.g. "America/Edmonton")
   publicPageEnabled: boolean;
   emailFromName: string;
-  emailFromAddress: string;     // Resend verified sender address
+  emailFromAddress: string;     // Beta: verified ticketfarm.ca sender address
   stripeCustomerId?: string;
   stripePriceId?: string;
   subscriptionStatus: SubscriptionStatus;
@@ -67,7 +67,7 @@ export interface Ticket {
   _id?: ObjectId;
   orgId: string;        // Clerk org_xxx
   ticketNumber: number;
-  ticketId: string;     // Unique 6-digit ID
+  ticketId: string;     // Unique 12-character uppercase base36 ID
   name: string;
   email: string;
   date: string;         // "YYYY-MM-DD"

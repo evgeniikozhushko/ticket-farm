@@ -5,6 +5,7 @@ const lotteriesCollection = vi.hoisted(() => ({
   updateOne: vi.fn(),
 }));
 const registrantsCollection = vi.hoisted(() => ({
+  findOne: vi.fn(),
   insertOne: vi.fn(),
 }));
 const rateLimitsCollection = vi.hoisted(() => ({
@@ -49,6 +50,7 @@ describe("public registration", () => {
   beforeEach(() => {
     lotteriesCollection.findOneAndUpdate.mockReset();
     lotteriesCollection.updateOne.mockReset();
+    registrantsCollection.findOne.mockReset();
     registrantsCollection.insertOne.mockReset();
     rateLimitsCollection.findOneAndUpdate.mockReset();
     rateLimitsCollection.updateOne.mockReset();
@@ -63,12 +65,18 @@ describe("public registration", () => {
     headersMock.mockResolvedValue(new Headers({ "x-forwarded-for": "203.0.113.10" }));
     rateLimitsCollection.findOneAndUpdate.mockResolvedValue({ count: 1 });
     lotteriesCollection.findOneAndUpdate.mockResolvedValue({ orgId: "org_1", date: "2026-05-28" });
+    registrantsCollection.findOne.mockResolvedValue(null);
     registrantsCollection.insertOne.mockResolvedValue({ acknowledged: true });
     lotteriesCollection.updateOne.mockResolvedValue({ modifiedCount: 1 });
+    rateLimitsCollection.updateOne.mockResolvedValue({ modifiedCount: 1 });
   });
 
-  it("returns the duplicate message when insertOne hits the duplicate index", async () => {
-    registrantsCollection.insertOne.mockRejectedValue({ code: 11000 });
+  it("returns the duplicate message before consuming quota or rate limits when already entered", async () => {
+    registrantsCollection.findOne.mockResolvedValue({
+      orgId: "org_1",
+      email: "person@example.com",
+      date: "2026-05-28",
+    });
     const { enterLottery } = await loadAction();
 
     const result = await enterLottery("farm", validForm());
@@ -77,10 +85,9 @@ describe("public registration", () => {
       success: false,
       error: "You've already entered today's lottery. Please check back tomorrow.",
     });
-    expect(lotteriesCollection.updateOne).toHaveBeenCalledWith(
-      { orgId: "org_1", date: "2026-05-28" },
-      { $inc: { registrantCount: -1 } }
-    );
+    expect(lotteriesCollection.findOneAndUpdate).not.toHaveBeenCalled();
+    expect(rateLimitsCollection.findOneAndUpdate).not.toHaveBeenCalled();
+    expect(registrantsCollection.insertOne).not.toHaveBeenCalled();
   });
 
   it("returns the quota message when no quota slot is available", async () => {
@@ -92,6 +99,7 @@ describe("public registration", () => {
       error: "Registration is full for today. Check back tomorrow.",
     });
     expect(registrantsCollection.insertOne).not.toHaveBeenCalled();
+    expect(rateLimitsCollection.findOneAndUpdate).not.toHaveBeenCalled();
   });
 
   it("claims a quota slot on legacy lottery documents missing registrantCount", async () => {
@@ -121,6 +129,7 @@ describe("public registration", () => {
       },
       { upsert: true, returnDocument: "after" }
     );
+    expect(rateLimitsCollection.findOneAndUpdate).toHaveBeenCalledTimes(2);
     expect(registrantsCollection.insertOne).toHaveBeenCalledWith({
       orgId: "org_1",
       name: "Person",
@@ -128,6 +137,15 @@ describe("public registration", () => {
       date: "2026-05-28",
       enteredAt: expect.any(Date),
     });
+    expect(registrantsCollection.findOne.mock.invocationCallOrder[0]).toBeLessThan(
+      lotteriesCollection.findOneAndUpdate.mock.invocationCallOrder[0]
+    );
+    expect(lotteriesCollection.findOneAndUpdate.mock.invocationCallOrder[0]).toBeLessThan(
+      rateLimitsCollection.findOneAndUpdate.mock.invocationCallOrder[0]
+    );
+    expect(rateLimitsCollection.findOneAndUpdate.mock.invocationCallOrder[0]).toBeLessThan(
+      registrantsCollection.insertOne.mock.invocationCallOrder[0]
+    );
   });
 
   it("does not add a registrantCount guard for unlimited plans", async () => {
@@ -192,7 +210,7 @@ describe("public registration", () => {
     );
   });
 
-  it("rolls back quota on any insert failure", async () => {
+  it("rolls back quota and consumed rate limits on any insert failure", async () => {
     registrantsCollection.insertOne.mockRejectedValue(new Error("write failed"));
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const { enterLottery } = await loadAction();
@@ -205,7 +223,29 @@ describe("public registration", () => {
       { orgId: "org_1", date: "2026-05-28" },
       { $inc: { registrantCount: -1 } }
     );
+    expect(rateLimitsCollection.updateOne).toHaveBeenCalledTimes(2);
+    expect(rateLimitsCollection.updateOne).toHaveBeenCalledWith(
+      { key: expect.any(String), count: { $gt: 0 } },
+      { $inc: { count: -1 }, $set: { updatedAt: expect.any(Date) } }
+    );
     errorSpy.mockRestore();
+  });
+
+  it("returns the duplicate message and rolls back quota and rate limits when insert races the duplicate precheck", async () => {
+    registrantsCollection.insertOne.mockRejectedValue({ code: 11000 });
+    const { enterLottery } = await loadAction();
+
+    const result = await enterLottery("farm", validForm());
+
+    expect(result).toEqual({
+      success: false,
+      error: "You've already entered today's lottery. Please check back tomorrow.",
+    });
+    expect(lotteriesCollection.updateOne).toHaveBeenCalledWith(
+      { orgId: "org_1", date: "2026-05-28" },
+      { $inc: { registrantCount: -1 } }
+    );
+    expect(rateLimitsCollection.updateOne).toHaveBeenCalledTimes(2);
   });
 
   it("retries quota upsert duplicate races and logs after retry exhaustion", async () => {
@@ -223,7 +263,7 @@ describe("public registration", () => {
     errorSpy.mockRestore();
   });
 
-  it("returns the rate-limit message when IP or email attempts are capped", async () => {
+  it("returns the rate-limit message and rolls back quota when IP or email attempts are capped", async () => {
     rateLimitsCollection.findOneAndUpdate.mockResolvedValueOnce(null).mockResolvedValueOnce({ count: 1 });
     const { enterLottery } = await loadAction();
 
@@ -231,6 +271,12 @@ describe("public registration", () => {
       success: false,
       error: "Too many registration attempts. Please try again later.",
     });
-    expect(lotteriesCollection.findOneAndUpdate).not.toHaveBeenCalled();
+    expect(lotteriesCollection.findOneAndUpdate).toHaveBeenCalled();
+    expect(lotteriesCollection.updateOne).toHaveBeenCalledWith(
+      { orgId: "org_1", date: "2026-05-28" },
+      { $inc: { registrantCount: -1 } }
+    );
+    expect(registrantsCollection.insertOne).not.toHaveBeenCalled();
+    expect(rateLimitsCollection.updateOne).toHaveBeenCalledTimes(1);
   });
 });

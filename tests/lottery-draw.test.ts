@@ -1,5 +1,6 @@
 import { ObjectId } from "mongodb";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { Ticket } from "@/lib/types";
 
 const requireRoleMock = vi.hoisted(() => vi.fn());
 const getOrganizationMock = vi.hoisted(() => vi.fn());
@@ -91,13 +92,37 @@ describe("drawTodayLottery", () => {
     ];
     lotteriesCollection.updateOne.mockResolvedValue({ matchedCount: 1 });
     registrantsCollection.find.mockReturnValue({ toArray: vi.fn().mockResolvedValue(registrants) });
-    ticketsCollection.insertMany.mockRejectedValue({ code: 11000 });
+    dispatchesCollection.insertOne.mockRejectedValue({
+      code: 11000,
+      keyPattern: { orgId: 1, date: 1, eventName: 1 },
+    });
     const { drawTodayLottery } = await loadAction();
 
     await expect(drawTodayLottery(1)).resolves.toEqual({
       success: false,
       error: "Lottery already drawn for today.",
     });
+    expect(dispatchWinnerEmailEventMock).not.toHaveBeenCalled();
+  });
+
+  it("aborts the transaction on a ticket ID collision without retrying inside the transaction", async () => {
+    const registrants = [
+      { _id: new ObjectId(), orgId: "org_1", name: "Ada", email: "ada@example.com", date: "2026-05-28", enteredAt: new Date("2026-05-28T12:00:00Z") },
+      { _id: new ObjectId(), orgId: "org_1", name: "Lin", email: "lin@example.com", date: "2026-05-28", enteredAt: new Date("2026-05-28T12:01:00Z") },
+    ];
+    lotteriesCollection.updateOne.mockResolvedValue({ matchedCount: 1 });
+    registrantsCollection.find.mockReturnValue({ toArray: vi.fn().mockResolvedValue(registrants) });
+    ticketsCollection.insertMany.mockRejectedValue({ code: 11000, keyPattern: { ticketId: 1 } });
+    const { drawTodayLottery } = await loadAction();
+
+    const result = await drawTodayLottery(2);
+
+    expect(result).toEqual({
+      success: false,
+      error: "Could not generate unique ticket IDs. Please try again.",
+    });
+    expect(ticketsCollection.insertMany).toHaveBeenCalledTimes(1);
+    expect(dispatchesCollection.insertOne).not.toHaveBeenCalled();
     expect(dispatchWinnerEmailEventMock).not.toHaveBeenCalled();
   });
 
@@ -114,6 +139,12 @@ describe("drawTodayLottery", () => {
 
     expect(result.success).toBe(true);
     expect(ticketsCollection.insertMany).toHaveBeenCalledOnce();
+    const ticketDocs = ticketsCollection.insertMany.mock.calls[0][0] as Omit<Ticket, "_id">[];
+    expect(ticketDocs).toHaveLength(2);
+    expect(ticketDocs.map((ticket) => ticket.ticketNumber)).toEqual([1, 2]);
+    for (const ticket of ticketDocs) {
+      expect(ticket.ticketId).toMatch(/^[0-9A-Z]{12}$/);
+    }
     expect(dispatchesCollection.insertOne).toHaveBeenCalledOnce();
     expect(dispatchWinnerEmailEventMock).toHaveBeenCalledOnce();
     expect(dispatchWinnerEmailEventMock).toHaveBeenCalledWith({ orgId: "org_1", date: "2026-05-28" });

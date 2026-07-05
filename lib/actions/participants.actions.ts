@@ -2,6 +2,7 @@
 
 import { getRegistrantsCollection, getTicketsCollection } from "@/lib/mongodb";
 import { requireRole } from "@/lib/authz";
+import type { Document } from "mongodb";
 import type {
   ParticipantHistoryEntry,
   ParticipantSummary,
@@ -15,75 +16,144 @@ type ListOrgParticipantsOptions = {
   cursor?: string;
 };
 
+export type ListOrgParticipantsResult = {
+  participants: ParticipantSummary[];
+  nextCursor?: string;
+};
+
 function normalizeParticipantEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function titleCaseWords(value: string): string {
+  return value
+    .split(/\s+/)
+    .map((word) => (word ? `${word[0].toUpperCase()}${word.slice(1).toLowerCase()}` : word))
+    .join(" ");
+}
+
 export async function listOrgParticipants(
   opts: ListOrgParticipantsOptions
-): Promise<ParticipantSummary[]> {
+): Promise<ListOrgParticipantsResult> {
   const { orgId } = await requireRole("org:member");
   const registrantsCollection = await getRegistrantsCollection();
-  const ticketsCollection = await getTicketsCollection();
 
   const limit = Math.min(Math.max(opts.limit, 1), 100);
-  const search = opts.search?.trim().toLowerCase() ?? "";
+  const rawSearch = opts.search?.trim() ?? "";
+  const search = rawSearch.toLowerCase();
   const cursor = opts.cursor?.trim().toLowerCase();
 
-  const [registrants, tickets] = await Promise.all([
-    registrantsCollection.find({ orgId }).sort({ enteredAt: 1 }).toArray(),
-    ticketsCollection.find({ orgId }).toArray(),
-  ]);
+  const match: Document = { orgId };
+  const participantMatch: Document = {};
+  const searchClauses: Document[] = [];
+  if (search) {
+    searchClauses.push({ email: { $regex: `^${escapeRegExp(search)}` } });
 
-  const ticketsByEmail = new Map<string, Ticket[]>();
-  for (const ticket of tickets) {
-    const email = normalizeParticipantEmail(ticket.email);
-    ticketsByEmail.set(email, [...(ticketsByEmail.get(email) ?? []), ticket]);
-  }
-
-  const summaries = new Map<string, ParticipantSummary>();
-  for (const registrant of registrants as Registrant[]) {
-    const email = normalizeParticipantEmail(registrant.email);
-    const existing = summaries.get(email);
-
-    if (!existing) {
-      summaries.set(email, {
-        orgId,
-        email,
-        latestName: registrant.name,
-        firstEnteredAt: registrant.enteredAt,
-        lastEnteredAt: registrant.enteredAt,
-        entryCount: 1,
-        winCount: 0,
-        activeTicketCount: 0,
-        checkedInTicketCount: 0,
-      });
-      continue;
+    const namePrefixes = new Set([
+      rawSearch,
+      search,
+      titleCaseWords(rawSearch),
+    ]);
+    for (const prefix of namePrefixes) {
+      if (prefix) {
+        searchClauses.push({ latestName: { $regex: `^${escapeRegExp(prefix)}` } });
+      }
     }
-
-    existing.latestName = registrant.name;
-    existing.lastEnteredAt = registrant.enteredAt;
-    existing.entryCount += 1;
   }
 
-  for (const summary of summaries.values()) {
-    const participantTickets = ticketsByEmail.get(summary.email) ?? [];
-    summary.winCount = participantTickets.length;
-    summary.activeTicketCount = participantTickets.filter((ticket) => ticket.status === "ACTIVE").length;
-    summary.checkedInTicketCount = participantTickets.filter((ticket) => ticket.status === "CHECKED_IN").length;
+  if (cursor) {
+    participantMatch.email = { $gt: cursor };
+  }
+  if (searchClauses.length > 0) {
+    participantMatch.$or = searchClauses;
   }
 
-  return [...summaries.values()]
-    .filter((summary) => {
-      if (!search) return true;
-      return (
-        summary.email.includes(search) ||
-        summary.latestName.toLowerCase().includes(search)
-      );
-    })
-    .filter((summary) => (cursor ? summary.email > cursor : true))
-    .sort((a, b) => a.email.localeCompare(b.email))
-    .slice(0, limit);
+  const rows = await registrantsCollection
+    .aggregate<ParticipantSummary>([
+      { $match: match },
+      {
+        $set: {
+          participantEmail: { $toLower: { $trim: { input: "$email" } } },
+        },
+      },
+      { $sort: { participantEmail: 1, enteredAt: 1 } },
+      {
+        $group: {
+          _id: "$participantEmail",
+          orgId: { $first: "$orgId" },
+          email: { $first: "$participantEmail" },
+          latestName: { $last: "$name" },
+          firstEnteredAt: { $first: "$enteredAt" },
+          lastEnteredAt: { $last: "$enteredAt" },
+          entryCount: { $sum: 1 },
+        },
+      },
+      { $sort: { email: 1 } },
+      ...(Object.keys(participantMatch).length > 0
+        ? [{ $match: participantMatch }]
+        : []),
+      { $limit: limit + 1 },
+      {
+        $lookup: {
+          from: "tickets",
+          let: { orgId: "$orgId", email: "$email" },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ["$orgId", "$$orgId"] },
+                    { $eq: ["$email", "$$email"] },
+                  ],
+                },
+              },
+            },
+            {
+              $group: {
+                _id: null,
+                winCount: { $sum: 1 },
+                activeTicketCount: {
+                  $sum: { $cond: [{ $eq: ["$status", "ACTIVE"] }, 1, 0] },
+                },
+                checkedInTicketCount: {
+                  $sum: { $cond: [{ $eq: ["$status", "CHECKED_IN"] }, 1, 0] },
+                },
+              },
+            },
+          ],
+          as: "ticketCounts",
+        },
+      },
+      {
+        $set: {
+          ticketCounts: { $first: "$ticketCounts" },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          orgId: 1,
+          email: 1,
+          latestName: 1,
+          firstEnteredAt: 1,
+          lastEnteredAt: 1,
+          entryCount: 1,
+          winCount: { $ifNull: ["$ticketCounts.winCount", 0] },
+          activeTicketCount: { $ifNull: ["$ticketCounts.activeTicketCount", 0] },
+          checkedInTicketCount: { $ifNull: ["$ticketCounts.checkedInTicketCount", 0] },
+        },
+      },
+    ])
+    .toArray();
+
+  const participants = rows.slice(0, limit);
+  const nextCursor = rows.length > limit ? participants.at(-1)?.email : undefined;
+
+  return { participants, nextCursor };
 }
 
 export async function getParticipantHistory(

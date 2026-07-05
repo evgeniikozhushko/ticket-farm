@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { getAuthenticatedOrgHomePath } from "@/lib/org-setup";
 
 export default async function RootPage() {
   const { userId, orgId } = await auth();
@@ -48,6 +49,5 @@ export default async function RootPage() {
     );
   }
 
-  if (!orgId) redirect("/onboarding");
-  redirect("/dashboard/lottery");
+  redirect(await getAuthenticatedOrgHomePath(orgId));
 }
