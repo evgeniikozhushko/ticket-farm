@@ -195,3 +195,52 @@ the generic error.
   [ ] Old pre-org indexes absent
   [ ] Real production public signup tested
   [ ] Duplicate signup behavior tested
+
+## Production Vercel MongoDB incident checklist
+
+If Vercel Runtime Logs show any of the following against pages that
+touch Mongo (typically `/`, `/onboarding`, `/dashboard/*`, `/[orgSlug]`),
+work through the checks below in order. Pages that do not touch Mongo
+(`/sign-up`, `/about`, `/privacy`, `/terms`) will still return 200 even
+during a full DB outage, so a "some pages work, some don't" report is
+the strongest tell.
+
+Log signatures:
+
+- `MongoServerError: bad auth : authentication failed` (Atlas code `8000`)
+- `MongoServerSelectionError`
+- `tlsv1 alert internal error` / `ssl3_read_bytes`
+- `ReplicaSetNoPrimary`
+
+Ordered checks:
+
+1. **Verify the exact URI stored in Vercel.** Dashboard → Settings →
+   Environment Variables → click the eye icon on `MONGODB_URI` in the
+   **Production** scope. Compare hostname and username against your
+   Atlas Connect string. Look specifically for the literal
+   `<db_password>` placeholder — the Atlas Connect UI ships the URI
+   with `<db_password>` as a placeholder that must be replaced with
+   the real password.
+2. **Rotate the DB password in Atlas.** Database Access → edit user →
+   Autogenerate Secure Password → copy → Update User. Paste into
+   Vercel `MONGODB_URI` (Production scope). Percent-encode any
+   special characters (`@`, `#`, `:`, `/`, `?`, `%`).
+3. **Confirm the Atlas user has `readWrite`** on the target database.
+4. **Confirm Atlas Network Access.** Left sidebar of the Atlas
+   PROJECT that owns the prod cluster (Network Access is per-project,
+   not per-cluster). Should include `0.0.0.0/0` for Vercel serverless.
+5. **Confirm cluster status.** Prod cluster (not dev) must be Active
+   and not paused. Free/shared tiers auto-pause after ~7 days idle.
+6. **Redeploy Vercel.** Environment variable changes do not apply to
+   already-running deployments. Deployments tab → latest on `main` →
+   ⋯ → Redeploy → uncheck "Use existing build cache".
+
+Diagnostic command (from the repo root, replaces `.env.local` values
+inline for a one-shot test):
+
+```
+MONGODB_URI='mongodb+srv://…' MONGODB_DB_NAME='ticket_farm_prod' pnpm check-db
+```
+
+`pnpm check-db` also accepts optional lookups: `--org-name`,
+`--org-slug`, `--clerk-org-id`.

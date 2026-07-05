@@ -49,6 +49,20 @@ export type EnsureOrganizationResult =
   | { status: "needs-clerk-org" }
   | { status: "needs-form"; defaultSlug: string; error: string };
 
+function isClerkNotFoundError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const e = err as { status?: number; statusCode?: number; errors?: Array<{ code?: string }> };
+  if (e.status === 404 || e.statusCode === 404) return true;
+  if (Array.isArray(e.errors)) {
+    for (const item of e.errors) {
+      if (item?.code === "resource_not_found" || item?.code === "organization_not_found") {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 export async function ensureOrganizationDocument(): Promise<EnsureOrganizationResult> {
   const { userId, orgId } = await auth();
 
@@ -64,8 +78,17 @@ export async function ensureOrganizationDocument(): Promise<EnsureOrganizationRe
     return { status: "ok" };
   }
 
-  const client = await clerkClient();
-  const clerkOrg = await client.organizations.getOrganization({ organizationId: orgId });
+  let clerkOrg;
+  try {
+    const client = await clerkClient();
+    clerkOrg = await client.organizations.getOrganization({ organizationId: orgId });
+  } catch (err) {
+    if (isClerkNotFoundError(err)) {
+      console.warn("[ensureOrganizationDocument] Active Clerk org was not found", { orgId });
+      return { status: "needs-clerk-org" };
+    }
+    throw err;
+  }
 
   const fallbackSlug = clerkOrg.slug || normalizeOrgSlug(clerkOrg.name);
 
