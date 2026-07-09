@@ -225,6 +225,8 @@ export async function drawTodayLottery(
       throw err;
     }
 
+    let emailDispatchError: string | undefined;
+
     // Dispatch only after the transaction commits. If dispatch fails, the
     // email_dispatches row stays in `failed` and recoverWinnerEmailDispatchesFunction
     // (cron, every 15 min) will retry it without re-drawing or re-inserting tickets.
@@ -232,6 +234,8 @@ export async function drawTodayLottery(
       await dispatchWinnerEmailEvent({ orgId, date });
     } catch (err) {
       console.error("[drawTodayLottery] Email dispatch failed:", err);
+      emailDispatchError =
+        err instanceof Error ? err.message : "Winner email dispatch failed.";
     }
 
     const winners: WinnerInfo[] = selectedWinners.map((r, index) => ({
@@ -243,7 +247,13 @@ export async function drawTodayLottery(
       ticketId: ticketDocuments[index].ticketId,
     }));
 
-    return { success: true, winners, winnerCount, drawnAt: drawnAt.toISOString() };
+    return {
+      success: true,
+      winners,
+      winnerCount,
+      drawnAt: drawnAt.toISOString(),
+      ...(emailDispatchError ? { emailDispatchError } : {}),
+    };
   } catch (err) {
     console.error("drawTodayLottery error:", err);
     return { success: false, error: "Something went wrong while drawing the lottery. Please try again." };
