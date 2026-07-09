@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { getStripe } from "@/lib/stripe";
 import { getProcessedWebhookEventsCollection, getOrganizationsCollection } from "@/lib/mongodb";
-import { updateSubscriptionStatus } from "@/lib/actions/org.actions";
+import { isDuplicateKeyError } from "@/lib/mongo-errors";
+import { updateSubscriptionStatus } from "@/lib/orgs";
 import { getPlanFromPriceId } from "@/lib/plan-limits";
 import type { SubscriptionStatus } from "@/lib/types";
 
@@ -15,10 +16,6 @@ function stripeStatusToOurs(stripeStatus: string): SubscriptionStatus {
   if (stripeStatus === "past_due" || stripeStatus === "unpaid") return "past_due";
   if (stripeStatus === "canceled" || stripeStatus === "incomplete_expired") return "canceled";
   return "free";
-}
-
-function isDuplicateKeyError(err: unknown): boolean {
-  return typeof err === "object" && err !== null && "code" in err && (err as { code: number }).code === 11000;
 }
 
 export async function POST(req: NextRequest) {

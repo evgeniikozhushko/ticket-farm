@@ -22,7 +22,7 @@ vi.mock("@/lib/mongodb", () => ({
   getOrganizationsCollection: vi.fn(() => Promise.resolve(orgsCollection)),
 }));
 
-vi.mock("@/lib/actions/org.actions", () => ({
+vi.mock("@/lib/orgs", () => ({
   updateSubscriptionStatus: updateSubscriptionStatusMock,
 }));
 

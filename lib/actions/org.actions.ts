@@ -4,10 +4,11 @@ import { auth } from "@clerk/nextjs/server";
 import { getOrganizationsCollection } from "@/lib/mongodb";
 import { requireRole } from "@/lib/authz";
 import { invalidateOrgCache } from "@/lib/org-cache";
+import { isDuplicateKeyError } from "@/lib/mongo-errors";
 import { getPlanLimit } from "@/lib/plan-limits";
 import { parseOrgSlug } from "@/lib/slugs";
 import { getOrCreateStripeCustomer } from "@/lib/stripe";
-import type { Organization, PlanName, SubscriptionStatus } from "@/lib/types";
+import type { Organization } from "@/lib/types";
 import { z } from "zod";
 
 // Re-export for consumers that only need the helper
@@ -120,15 +121,6 @@ export async function createOrganization(
 }
 
 // ---------------------------------------------------------------------------
-// Read
-// ---------------------------------------------------------------------------
-
-export async function getOrganization(clerkOrgId: string): Promise<Organization | null> {
-  const collection = await getOrganizationsCollection();
-  return collection.findOne({ clerkOrgId });
-}
-
-// ---------------------------------------------------------------------------
 // Update
 // ---------------------------------------------------------------------------
 
@@ -150,15 +142,6 @@ const orgSettingsSchema = z
       .optional(),
   })
   .strict();
-
-function isDuplicateKeyError(err: unknown): boolean {
-  return Boolean(
-    err &&
-      typeof err === "object" &&
-      "code" in err &&
-      (err as { code?: unknown }).code === 11000
-  );
-}
 
 function getDuplicateKeyField(err: unknown): string | undefined {
   if (!err || typeof err !== "object" || !("keyPattern" in err)) {
@@ -215,36 +198,4 @@ export async function updateOrganizationSettings(
   }
 
   return { success: true };
-}
-
-// ---------------------------------------------------------------------------
-// Subscription status update (called from Stripe webhook — NOT a Server Action)
-// ---------------------------------------------------------------------------
-
-export async function updateSubscriptionStatus(
-  stripeCustomerId: string,
-  newStatus: SubscriptionStatus,
-  newPlanName: PlanName,
-  eventTimestamp: Date
-): Promise<void> {
-  const collection = await getOrganizationsCollection();
-
-  await collection.updateOne(
-    {
-      stripeCustomerId,
-      $or: [
-        { statusUpdatedAt: { $exists: false } },
-        { statusUpdatedAt: { $lt: eventTimestamp } },
-      ],
-    },
-    {
-      $set: {
-        subscriptionStatus: newStatus,
-        planName: newPlanName,
-        maxRegistrantsPerDay: getPlanLimit(newPlanName),
-        statusUpdatedAt: eventTimestamp,
-        updatedAt: new Date(),
-      },
-    }
-  );
 }

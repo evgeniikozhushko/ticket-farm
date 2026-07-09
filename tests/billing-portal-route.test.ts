@@ -8,7 +8,7 @@ vi.mock("@clerk/nextjs/server", () => ({
   auth: authMock,
 }));
 
-vi.mock("@/lib/actions/org.actions", () => ({
+vi.mock("@/lib/orgs", () => ({
   getOrganization: getOrganizationMock,
 }));
 

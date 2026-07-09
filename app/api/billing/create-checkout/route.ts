@@ -1,6 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
-import { getOrganization } from "@/lib/actions/org.actions";
+import { getOrganization } from "@/lib/orgs";
 import { getAppUrl } from "@/lib/app-url";
 import { getPriceIdForPlan } from "@/lib/plan-limits";
 import { getStripe, getOrCreateStripeCustomer } from "@/lib/stripe";
