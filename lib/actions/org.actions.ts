@@ -53,7 +53,8 @@ const createOrganizationSchema = z
     name: z.string().trim().min(1).max(120),
     slug: slugSchema,
     timezone: timezoneSchema,
-  });
+  })
+  .strict();
 
 export async function createOrganization(
   input: unknown

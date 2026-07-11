@@ -99,13 +99,32 @@ describe("createOrganization", () => {
     );
   });
 
-  it("uses auth orgId and ignores client-supplied org identity", async () => {
+  it("rejects client-supplied org identity", async () => {
     authMock.mockResolvedValue({ userId: "user_1", orgId: "org_real" });
     const { createOrganization } = await loadActions();
 
     await expect(
       createOrganization({
         clerkOrgId: "org_attacker",
+        name: "Canmore Food",
+        slug: "canmore-food",
+        timezone: "America/Edmonton",
+      })
+    ).resolves.toEqual({
+      success: false,
+      error: "Invalid organization details.",
+    });
+
+    expect(organizationsCollection.findOne).not.toHaveBeenCalled();
+    expect(organizationsCollection.insertOne).not.toHaveBeenCalled();
+  });
+
+  it("uses auth orgId for valid organization creation", async () => {
+    authMock.mockResolvedValue({ userId: "user_1", orgId: "org_real" });
+    const { createOrganization } = await loadActions();
+
+    await expect(
+      createOrganization({
         name: "Canmore Food",
         slug: "canmore-food",
         timezone: "America/Edmonton",
