@@ -2,7 +2,7 @@
 
 **Multi-tenant SaaS lottery & ticket management platform** — Organizations run daily lotteries where users register for free, winners are drawn automatically, and tickets are emailed with pickup details.
 
-🔗 **Live Demo:** [ticket-farm.vercel.app](https://ticket-farm.vercel.app)
+🔗 **Live Demo:** [ticketfarm.ca](https://ticketfarm.ca)
 
 ---
 
