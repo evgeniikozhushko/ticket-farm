@@ -1,11 +1,9 @@
 import Link from "next/link";
-import { AppSidebar } from "@/components/app-sidebar";
-import { SiteHeader } from "@/components/site-header";
+import { DashboardShell } from "@/components/dashboard-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import {
   Table,
   TableBody,
@@ -41,19 +39,9 @@ export default async function ParticipantsPage({
   const { participants, nextCursor } = participantPage;
 
   return (
-    <SidebarProvider
-      style={
-        {
-          "--sidebar-width": "calc(var(--spacing) * 72)",
-          "--header-height": "calc(var(--spacing) * 16)",
-        } as React.CSSProperties
-      }
-    >
-      <AppSidebar variant="inset" />
-      <SidebarInset>
-        <SiteHeader title="Participants" />
-        <div className="flex flex-1 flex-col">
-          <div className="flex flex-col gap-4 p-4 md:gap-6 md:p-6">
+    <DashboardShell title="Participants">
+      <div className="flex flex-1 flex-col">
+        <div className="flex flex-col gap-4 p-4 md:gap-6 md:p-6">
             <Card>
               <CardHeader>
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -224,9 +212,8 @@ export default async function ParticipantsPage({
                 </CardContent>
               </Card>
             )}
-          </div>
         </div>
-      </SidebarInset>
-    </SidebarProvider>
+      </div>
+    </DashboardShell>
   );
 }

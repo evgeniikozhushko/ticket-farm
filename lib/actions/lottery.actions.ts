@@ -8,6 +8,7 @@ import {
   getRegistrantsCollection,
 } from "@/lib/mongodb";
 import { getTodayDateString } from "@/lib/date";
+import { isDuplicateKeyError } from "@/lib/mongo-errors";
 import { getOrgBySlug } from "@/lib/org-cache";
 import type { Registrant } from "@/lib/types";
 
@@ -100,7 +101,7 @@ async function consumeRegistrationRateLimit(input: {
 
     return { allowed: result !== null, consumed: result !== null, key };
   } catch (err) {
-    if ((err as { code?: number }).code === 11000) {
+    if (isDuplicateKeyError(err)) {
       const retryResult = await collection.updateOne(
         { key, count: { $lt: input.limit } },
         {
@@ -232,14 +233,14 @@ export async function enterLottery(
         // E11000 can occur when two concurrent first-registrations both try to
         // upsert the same { orgId, date } Lottery document simultaneously.
         if (
-          (err as { code?: number }).code === 11000 &&
+          isDuplicateKeyError(err) &&
           attempt < MAX_QUOTA_RETRIES - 1
         ) {
           // Jittered backoff: 20–99 ms
           await new Promise((r) => setTimeout(r, randomInt(20, 100)));
           continue;
         }
-        if ((err as { code?: number }).code === 11000) {
+        if (isDuplicateKeyError(err)) {
           console.error("[quota] retry exhausted after", MAX_QUOTA_RETRIES, "attempts");
         }
         throw err;
@@ -307,10 +308,7 @@ export async function enterLottery(
       await rollbackRegistrationRateLimits(rateLimitConsumptions);
 
       // E11000: already registered today
-      if (
-        typeof err === "object" && err !== null &&
-        "code" in err && (err as { code: number }).code === 11000
-      ) {
+      if (isDuplicateKeyError(err)) {
         return {
           success: false,
           error: "You've already entered today's lottery. Please check back tomorrow.",

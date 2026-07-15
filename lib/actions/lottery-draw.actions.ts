@@ -12,8 +12,9 @@ import {
 import { getTodayDateString } from "@/lib/date";
 import type { DrawLotteryResult, WinnerInfo, Registrant, Ticket } from "@/lib/types";
 import { requireRole, requireActiveSub } from "@/lib/authz";
-import { getOrganization } from "@/lib/actions/org.actions";
+import { getOrganization } from "@/lib/orgs";
 import { dispatchWinnerEmailEvent } from "@/lib/email-dispatch-outbox";
+import { duplicateErrorIncludesField, isDuplicateKeyError } from "@/lib/mongo-errors";
 import type { EmailTicket } from "@/lib/email";
 
 const TICKET_ID_LENGTH = 12;
@@ -35,50 +36,6 @@ function generateTicketId(): string {
 }
 
 class DrawUserError extends Error {}
-
-function isDuplicateKeyError(err: unknown): boolean {
-  return typeof err === "object" && err !== null && "code" in err && (err as { code: number }).code === 11000;
-}
-
-function duplicateErrorIncludesField(err: unknown, field: string): boolean {
-  if (!err || typeof err !== "object") return false;
-
-  const error = err as {
-    keyPattern?: Record<string, unknown>;
-    keyValue?: Record<string, unknown>;
-    index?: string;
-    message?: string;
-    writeErrors?: Array<{
-      err?: {
-        keyPattern?: Record<string, unknown>;
-        keyValue?: Record<string, unknown>;
-        index?: string;
-        errmsg?: string;
-      };
-      keyPattern?: Record<string, unknown>;
-      keyValue?: Record<string, unknown>;
-      index?: string;
-      errmsg?: string;
-    }>;
-  };
-
-  if (error.keyPattern && field in error.keyPattern) return true;
-  if (error.keyValue && field in error.keyValue) return true;
-  if (error.index?.includes(field)) return true;
-  if (error.message?.includes(field)) return true;
-
-  return Boolean(
-    error.writeErrors?.some((writeError) => {
-      const nested = writeError.err ?? writeError;
-      return (
-        Boolean(nested.keyPattern && field in nested.keyPattern) ||
-        Boolean(nested.keyValue && field in nested.keyValue) ||
-        Boolean(nested.index?.includes(field)) ||
-        Boolean(nested.errmsg?.includes(field))
-      );
-    })
-  );
-}
 
 function isTicketIdDuplicateKeyError(err: unknown): boolean {
   return isDuplicateKeyError(err) && duplicateErrorIncludesField(err, "ticketId");
@@ -225,6 +182,8 @@ export async function drawTodayLottery(
       throw err;
     }
 
+    let emailDispatchError: string | undefined;
+
     // Dispatch only after the transaction commits. If dispatch fails, the
     // email_dispatches row stays in `failed` and recoverWinnerEmailDispatchesFunction
     // (cron, every 15 min) will retry it without re-drawing or re-inserting tickets.
@@ -232,6 +191,8 @@ export async function drawTodayLottery(
       await dispatchWinnerEmailEvent({ orgId, date });
     } catch (err) {
       console.error("[drawTodayLottery] Email dispatch failed:", err);
+      emailDispatchError =
+        err instanceof Error ? err.message : "Winner email dispatch failed.";
     }
 
     const winners: WinnerInfo[] = selectedWinners.map((r, index) => ({
@@ -243,7 +204,13 @@ export async function drawTodayLottery(
       ticketId: ticketDocuments[index].ticketId,
     }));
 
-    return { success: true, winners, winnerCount, drawnAt: drawnAt.toISOString() };
+    return {
+      success: true,
+      winners,
+      winnerCount,
+      drawnAt: drawnAt.toISOString(),
+      ...(emailDispatchError ? { emailDispatchError } : {}),
+    };
   } catch (err) {
     console.error("drawTodayLottery error:", err);
     return { success: false, error: "Something went wrong while drawing the lottery. Please try again." };

@@ -1,10 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/app-sidebar";
-import { SiteHeader } from "@/components/site-header";
+import { DashboardShell } from "@/components/dashboard-shell";
 import { OrgSettingsForm } from "@/components/org-settings-form";
-import { getOrganization } from "@/lib/actions/org.actions";
+import { getOrganization } from "@/lib/orgs";
 
 export const dynamic = "force-dynamic";
 
@@ -28,19 +26,9 @@ export default async function OrgSettingsPage() {
   };
 
   return (
-    <SidebarProvider
-      style={
-        {
-          "--sidebar-width": "calc(var(--spacing) * 72)",
-          "--header-height": "calc(var(--spacing) * 16)",
-        } as React.CSSProperties
-      }
-    >
-      <AppSidebar variant="inset" />
-      <SidebarInset>
-        <SiteHeader title="Organization Settings" />
-        <div className="flex flex-1 flex-col">
-          <div className="flex flex-col gap-4 p-4 md:gap-6 md:p-6">
+    <DashboardShell title="Organization Settings">
+      <div className="flex flex-1 flex-col">
+        <div className="flex flex-col gap-4 p-4 md:gap-6 md:p-6">
             <div>
               <h2 className="text-lg font-semibold">Organization settings</h2>
               <p className="text-sm text-muted-foreground">
@@ -66,9 +54,8 @@ export default async function OrgSettingsPage() {
                 <span className="capitalize">{org.subscriptionStatus}</span>
               </p>
             </div>
-          </div>
         </div>
-      </SidebarInset>
-    </SidebarProvider>
+      </div>
+    </DashboardShell>
   );
 }

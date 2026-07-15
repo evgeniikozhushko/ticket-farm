@@ -5,7 +5,7 @@ import { getRegistrantsCollection, getLotteriesCollection, getTicketsCollection 
 import { getTodayDateString } from "@/lib/date";
 import type { Registrant, Lottery, LotteryStats, WinnerInfo, Ticket } from "@/lib/types";
 import { requireRole } from "@/lib/authz";
-import { getOrganization } from "@/lib/actions/org.actions";
+import { getOrganization } from "@/lib/orgs";
 
 export async function getTodayLotteryStats(): Promise<LotteryStats> {
   try {

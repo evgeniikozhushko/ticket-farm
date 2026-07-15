@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { IconTrophy, IconLoader, IconMail, IconMailOff } from "@tabler/icons-react";
+import { IconAlertTriangle, IconTrophy, IconLoader, IconMail, IconMailOff } from "@tabler/icons-react";
 import { toast } from "sonner";
 import { drawTodayLottery } from "@/lib/actions/lottery-draw.actions";
 import type { WinnerInfo, LotteryStatus } from "@/lib/types";
@@ -35,6 +35,7 @@ export function LotteryDrawPanel({
   );
   const [isLoading, setIsLoading] = useState(false);
   const [lastDrawnAt, setLastDrawnAt] = useState<string | undefined>(drawnAt);
+  const [emailDispatchError, setEmailDispatchError] = useState<string | undefined>();
 
   const handleDraw = async () => {
     if (winnerCount <= 0) {
@@ -56,6 +57,7 @@ export function LotteryDrawPanel({
         setStatus("LOTTERY_DRAWN");
         setWinners(result.winners);
         setLastDrawnAt(result.drawnAt);
+        setEmailDispatchError(result.emailDispatchError);
 
         // Show success message with email status
         const emailsSent = result.winners.filter(w => w.emailSent).length;
@@ -72,6 +74,12 @@ export function LotteryDrawPanel({
         if (emailsFailed > 0) {
           toast.error(`Failed to send ${emailsFailed} email${emailsFailed !== 1 ? 's' : ''}`, {
             description: "Winners were selected but some emails could not be sent",
+          });
+        }
+
+        if (result.emailDispatchError) {
+          toast.warning("Winner emails did not queue", {
+            description: result.emailDispatchError,
           });
         }
       } else {
@@ -185,6 +193,17 @@ export function LotteryDrawPanel({
 
               return (
                 <>
+                  {emailDispatchError && (
+                    <Alert className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/20">
+                      <IconAlertTriangle className="size-4 text-amber-600 dark:text-amber-400" />
+                      <AlertDescription className="text-amber-800 dark:text-amber-200">
+                        Winners were selected, but email dispatch did not queue. The retry job may recover it.
+                        <br />
+                        <span className="mt-1 block text-sm">{emailDispatchError}</span>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
                   {emailsSent > 0 && (
                     <Alert className="border-green-500/50 bg-green-50 dark:bg-green-950/20">
                       <IconMail className="size-4 text-green-600 dark:text-green-400" />

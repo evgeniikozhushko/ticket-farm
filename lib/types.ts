@@ -192,6 +192,7 @@ export type DrawLotteryResult =
       winners: WinnerInfo[];
       winnerCount: number;
       drawnAt: string;
+      emailDispatchError?: string;
     }
   | {
       success: false;

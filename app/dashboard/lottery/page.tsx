@@ -1,6 +1,4 @@
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/app-sidebar";
-import { SiteHeader } from "@/components/site-header";
+import { DashboardShell } from "@/components/dashboard-shell";
 import { LotteryStatsCards } from "@/components/lottery/lottery-stats-cards";
 import { LotteryDrawPanel } from "@/components/lottery/lottery-draw-panel";
 import { RegistrantsDataTable } from "@/components/lottery/registrants-data-table";
@@ -45,38 +43,27 @@ export default async function LotteryAdminPage() {
   const serializedWinners = winners;
 
   return (
-    <SidebarProvider
-      style={
-        {
-          "--sidebar-width": "calc(var(--spacing) * 72)",
-          "--header-height": "calc(var(--spacing) * 16)",
-        } as React.CSSProperties
-      }
-    >
-      <AppSidebar variant="inset" />
-      <SidebarInset>
-        <SiteHeader title="Lottery Admin" />
-        <div className="flex flex-1 flex-col">
-          <div className="@container/main flex flex-1 flex-col gap-2">
-            <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-              {/* Statistics Cards */}
-              <LotteryStatsCards stats={serializedStats} />
+    <DashboardShell title="Lottery Admin">
+      <div className="flex flex-1 flex-col">
+        <div className="@container/main flex flex-1 flex-col gap-2">
+          <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
+            {/* Statistics Cards */}
+            <LotteryStatsCards stats={serializedStats} />
 
-              {/* Lottery Draw Panel */}
-              <LotteryDrawPanel
-                initialStatus={serializedStats.status}
-                initialWinners={serializedWinners}
-                totalRegistrants={serializedStats.totalRegistrants}
-                defaultWinnerCount={serializedStats.maxTicketsAvailable}
-                drawnAt={serializedStats.drawnAt}
-              />
+            {/* Lottery Draw Panel */}
+            <LotteryDrawPanel
+              initialStatus={serializedStats.status}
+              initialWinners={serializedWinners}
+              totalRegistrants={serializedStats.totalRegistrants}
+              defaultWinnerCount={serializedStats.maxTicketsAvailable}
+              drawnAt={serializedStats.drawnAt}
+            />
 
-              {/* All Registrants Table */}
-              <RegistrantsDataTable registrants={serializedRegistrants} />
-            </div>
+            {/* All Registrants Table */}
+            <RegistrantsDataTable registrants={serializedRegistrants} />
           </div>
         </div>
-      </SidebarInset>
-    </SidebarProvider>
+      </div>
+    </DashboardShell>
   );
 }

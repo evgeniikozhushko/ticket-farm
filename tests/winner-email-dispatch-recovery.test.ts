@@ -120,7 +120,7 @@ vi.mock("@/lib/authz", () => ({
   requireActiveSub: vi.fn(() => undefined),
 }));
 
-vi.mock("@/lib/actions/org.actions", () => ({
+vi.mock("@/lib/orgs", () => ({
   getOrganization: getOrganizationMock,
 }));
 

@@ -1,10 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/app-sidebar";
-import { SiteHeader } from "@/components/site-header";
+import { DashboardShell } from "@/components/dashboard-shell";
 import { BillingActionButton } from "@/components/billing-actions";
-import { getOrganization } from "@/lib/actions/org.actions";
+import { getOrganization } from "@/lib/orgs";
 import { getLotteriesCollection } from "@/lib/mongodb";
 import { getTodayDateString } from "@/lib/date";
 import { PLAN_DISPLAY, getPriceIdForPlan, PLAN_LIMITS, formatPlanLimit } from "@/lib/plan-limits";
@@ -41,19 +39,9 @@ export default async function BillingPage({
   const isRestricted = isPastDue || isCanceled;
 
   return (
-    <SidebarProvider
-      style={
-        {
-          "--sidebar-width": "calc(var(--spacing) * 72)",
-          "--header-height": "calc(var(--spacing) * 16)",
-        } as React.CSSProperties
-      }
-    >
-      <AppSidebar variant="inset" />
-      <SidebarInset>
-        <SiteHeader title="Billing" />
-        <div className="flex flex-1 flex-col">
-          <div className="flex flex-col gap-6 p-4 md:p-6">
+    <DashboardShell title="Billing">
+      <div className="flex flex-1 flex-col">
+        <div className="flex flex-col gap-6 p-4 md:p-6">
             {/* Success banner */}
             {success && (
               <div className="rounded-lg bg-green-50 p-4 text-sm text-green-700">
@@ -185,9 +173,8 @@ export default async function BillingPage({
                 })}
               </div>
             </div>
-          </div>
         </div>
-      </SidebarInset>
-    </SidebarProvider>
+      </div>
+    </DashboardShell>
   );
 }
