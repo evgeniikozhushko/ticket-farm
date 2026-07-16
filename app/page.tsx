@@ -28,6 +28,9 @@ export default async function RootPage() {
               <Button asChild size="lg">
                 <Link href="/sign-up">Start an organization</Link>
               </Button>
+              <Button asChild size="lg" variant="secondary">
+                <Link href="/sign-in">Sign in</Link>
+              </Button>
               <Button asChild size="lg" variant="outline">
                 <Link href="/about">About Ticket Farm</Link>
               </Button>
