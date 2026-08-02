@@ -2,6 +2,7 @@
 
 import { randomInt } from "crypto";
 import { ObjectId } from "mongodb";
+import { revalidatePath } from "next/cache";
 import {
   getClient,
   getEmailDispatchesCollection,
@@ -10,7 +11,13 @@ import {
   getTicketsCollection,
 } from "@/lib/mongodb";
 import { getTodayDateString } from "@/lib/date";
-import type { DrawLotteryResult, WinnerInfo, Registrant, Ticket } from "@/lib/types";
+import type {
+  DrawLotteryResult,
+  RetryWinnerEmailsResult,
+  WinnerInfo,
+  Registrant,
+  Ticket,
+} from "@/lib/types";
 import { requireRole, requireActiveSub } from "@/lib/authz";
 import { getOrganization } from "@/lib/orgs";
 import { dispatchWinnerEmailEvent } from "@/lib/email-dispatch-outbox";
@@ -57,6 +64,26 @@ function buildTicketDocuments(input: {
     pickupTime: "5:30 PM",
     status: "ACTIVE",
     generatedAt: input.drawnAt,
+  }));
+}
+
+function buildEmailTickets(input: {
+  tickets: Omit<Ticket, "_id">[] | Ticket[];
+  orgName: string;
+  emailFromAddress: string;
+  emailFromName: string;
+}): EmailTicket[] {
+  return input.tickets.map((ticket) => ({
+    name: ticket.name,
+    email: ticket.email,
+    ticketNumber: ticket.ticketNumber,
+    ticketId: ticket.ticketId,
+    date: ticket.date,
+    pickupTime: ticket.pickupTime,
+    orgName: input.orgName,
+    pickupLocation: undefined,
+    emailFromAddress: input.emailFromAddress,
+    emailFromName: input.emailFromName,
   }));
 }
 
@@ -132,18 +159,12 @@ export async function drawTodayLottery(
             throw err;
           }
 
-          const emailTickets: EmailTicket[] = ticketDocuments.map((ticket) => ({
-            name: ticket.name,
-            email: ticket.email,
-            ticketNumber: ticket.ticketNumber,
-            ticketId: ticket.ticketId,
-            date: ticket.date,
-            pickupTime: ticket.pickupTime,
+          const emailTickets = buildEmailTickets({
+            tickets: ticketDocuments,
             orgName: org.name,
-            pickupLocation: undefined,
             emailFromAddress: org.emailFromAddress,
             emailFromName: org.emailFromName,
-          }));
+          });
 
           const now = new Date();
           await lotteriesCollection.updateOne(
@@ -162,6 +183,7 @@ export async function drawTodayLottery(
               orgId,
               date,
               eventName: "lottery/draw.completed",
+              dispatchKind: "draw",
               payload: { orgId, date, tickets: emailTickets },
               status: "pending",
               attempts: 0,
@@ -214,5 +236,81 @@ export async function drawTodayLottery(
   } catch (err) {
     console.error("drawTodayLottery error:", err);
     return { success: false, error: "Something went wrong while drawing the lottery. Please try again." };
+  }
+}
+
+export async function retryTodayWinnerEmails(): Promise<RetryWinnerEmailsResult> {
+  try {
+    const { orgId } = await requireRole("org:admin");
+
+    const org = await getOrganization(orgId);
+    if (!org) {
+      return { success: false, error: "Organization not found." };
+    }
+
+    const date = getTodayDateString(org.timezone);
+    const ticketsCollection = await getTicketsCollection();
+    const dispatchesCollection = await getEmailDispatchesCollection();
+
+    const unsentTickets = await ticketsCollection
+      .find({ orgId, date, status: "ACTIVE", emailSent: { $ne: true } })
+      .sort({ ticketNumber: 1 })
+      .toArray();
+
+    if (unsentTickets.length === 0) {
+      return { success: true, queued: 0 };
+    }
+
+    const emailTickets = buildEmailTickets({
+      tickets: unsentTickets,
+      orgName: org.name,
+      emailFromAddress: org.emailFromAddress,
+      emailFromName: org.emailFromName,
+    });
+    const now = new Date();
+
+    let dispatchId: ObjectId;
+    try {
+      const insertResult = await dispatchesCollection.insertOne({
+        orgId,
+        date,
+        eventName: "lottery/draw.completed",
+        dispatchKind: "manual_retry",
+        payload: { orgId, date, tickets: emailTickets },
+        status: "pending",
+        attempts: 0,
+        createdAt: now,
+        updatedAt: now,
+      });
+      dispatchId = insertResult.insertedId;
+    } catch (err) {
+      if (isDuplicateKeyError(err)) {
+        const message = duplicateErrorIncludesField(err, "dispatchKind")
+          ? "A winner email retry is already queued or dispatching."
+          : "Email retry requires the email dispatch index migration. Run the database setup before retrying.";
+        return { success: false, error: message };
+      }
+      throw err;
+    }
+
+    let emailDispatchError: string | undefined;
+    try {
+      await dispatchWinnerEmailEvent({ dispatchId });
+    } catch (err) {
+      console.error("[retryTodayWinnerEmails] Email dispatch failed:", err);
+      emailDispatchError =
+        err instanceof Error ? err.message : "Winner email retry dispatch failed.";
+    }
+
+    revalidatePath("/dashboard/lottery");
+
+    return {
+      success: true,
+      queued: unsentTickets.length,
+      ...(emailDispatchError ? { emailDispatchError } : {}),
+    };
+  } catch (err) {
+    console.error("retryTodayWinnerEmails error:", err);
+    return { success: false, error: "Something went wrong while retrying winner emails." };
   }
 }

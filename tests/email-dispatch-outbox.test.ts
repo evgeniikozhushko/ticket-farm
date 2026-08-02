@@ -87,4 +87,29 @@ describe("email dispatch outbox", () => {
       })
     );
   });
+
+  it("can claim a specific dispatch row by id", async () => {
+    const dispatchId = new ObjectId();
+    dispatchesCollection.findOneAndUpdate.mockResolvedValue({
+      _id: dispatchId,
+      orgId: "org_1",
+      date: "2026-05-28",
+      eventName: "lottery/draw.completed",
+      payload: { orgId: "org_1", date: "2026-05-28", tickets: [] },
+    });
+    inngestSendMock.mockResolvedValue(undefined);
+    const { dispatchWinnerEmailEvent } = await import("@/lib/email-dispatch-outbox");
+
+    await expect(dispatchWinnerEmailEvent({ dispatchId })).resolves.toBe(true);
+
+    expect(dispatchesCollection.findOneAndUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        _id: dispatchId,
+        eventName: "lottery/draw.completed",
+        status: { $in: ["pending", "failed"] },
+      }),
+      expect.any(Object),
+      expect.any(Object)
+    );
+  });
 });
