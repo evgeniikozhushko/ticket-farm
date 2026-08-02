@@ -15,15 +15,16 @@ type DispatchRow = {
   updatedAt: Date;
 };
 
-// Single-row in-memory mock of the email_dispatches collection. Implements just
+// Multi-row in-memory mock of the email_dispatches collection. Implements just
 // the slice of Mongo semantics the outbox uses: insertOne assigns an _id,
 // findOneAndUpdate honors the same filters dispatchWinnerEmailEvent sends and
 // returns the post-update doc, updateOne applies $set and deletes $unset keys.
 const store = vi.hoisted(() => {
-  let row: DispatchRow | null = null;
+  let rows: DispatchRow[] = [];
 
-  function matches(filter: Record<string, unknown>): boolean {
+  function matches(row: DispatchRow, filter: Record<string, unknown>): boolean {
     if (!row) return false;
+    if (filter._id && !row._id.equals(filter._id as ObjectId)) return false;
     if (filter.eventName !== undefined && row.eventName !== filter.eventName) return false;
     const statusFilter = filter.status as { $in?: string[] } | undefined;
     if (statusFilter?.$in && !statusFilter.$in.includes(row.status)) return false;
@@ -38,16 +39,16 @@ const store = vi.hoisted(() => {
 
   return {
     reset() {
-      row = null;
+      rows = [];
     },
     only(): DispatchRow {
-      if (!row) throw new Error("email_dispatches store is empty");
-      return row;
+      if (rows.length !== 1) throw new Error(`expected 1 email_dispatches row, got ${rows.length}`);
+      return rows[0];
     },
     collection: {
       insertOne: vi.fn(async (doc: Omit<DispatchRow, "_id">) => {
         const _id = new ObjectId();
-        row = { ...doc, _id };
+        rows.push({ ...doc, _id });
         return { acknowledged: true, insertedId: _id };
       }),
       findOneAndUpdate: vi.fn(
@@ -55,8 +56,8 @@ const store = vi.hoisted(() => {
           filter: Record<string, unknown>,
           update: { $set?: Record<string, unknown>; $inc?: Record<string, number> },
         ) => {
-          if (!matches(filter)) return null;
-          const target = row as DispatchRow;
+          const target = rows.find((candidate) => matches(candidate, filter));
+          if (!target) return null;
           if (update.$inc) {
             for (const [k, v] of Object.entries(update.$inc)) {
               (target as Record<string, unknown>)[k] =
@@ -76,8 +77,8 @@ const store = vi.hoisted(() => {
           filter: { _id?: ObjectId },
           update: { $set?: Record<string, unknown>; $unset?: Record<string, unknown> },
         ) => {
+          const row = rows.find((candidate) => !filter._id || candidate._id.equals(filter._id));
           if (!row) return { matchedCount: 0 };
-          if (filter._id && !row._id.equals(filter._id)) return { matchedCount: 0 };
           if (update.$set) {
             for (const [k, v] of Object.entries(update.$set)) {
               (row as Record<string, unknown>)[k] = v;

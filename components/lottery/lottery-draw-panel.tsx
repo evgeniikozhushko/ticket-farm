@@ -1,15 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { IconAlertTriangle, IconTrophy, IconLoader, IconMail, IconMailOff } from "@tabler/icons-react";
+import { IconAlertTriangle, IconTrophy, IconLoader, IconMail, IconMailOff, IconRefresh } from "@tabler/icons-react";
 import { toast } from "sonner";
-import { drawTodayLottery } from "@/lib/actions/lottery-draw.actions";
+import { drawTodayLottery, retryTodayWinnerEmails } from "@/lib/actions/lottery-draw.actions";
 import type { WinnerInfo, LotteryStatus } from "@/lib/types";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -28,14 +29,23 @@ export function LotteryDrawPanel({
   defaultWinnerCount,
   drawnAt,
 }: LotteryDrawPanelProps) {
+  const router = useRouter();
   const [status, setStatus] = useState<LotteryStatus>(initialStatus);
   const [winners, setWinners] = useState<WinnerInfo[]>(initialWinners);
   const [winnerCount, setWinnerCount] = useState(
     defaultWinnerCount > 0 ? defaultWinnerCount : Math.min(10, totalRegistrants)
   );
   const [isLoading, setIsLoading] = useState(false);
+  const [isRetryingEmails, setIsRetryingEmails] = useState(false);
   const [lastDrawnAt, setLastDrawnAt] = useState<string | undefined>(drawnAt);
   const [emailDispatchError, setEmailDispatchError] = useState<string | undefined>();
+
+  useEffect(() => {
+    setStatus(initialStatus);
+    setWinners(initialWinners);
+    setLastDrawnAt(drawnAt);
+    setEmailDispatchError(undefined);
+  }, [initialStatus, initialWinners, drawnAt]);
 
   const handleDraw = async () => {
     if (winnerCount <= 0) {
@@ -108,6 +118,46 @@ export function LotteryDrawPanel({
       minute: "2-digit",
     });
   };
+
+  const handleRetryEmails = async () => {
+    setIsRetryingEmails(true);
+
+    try {
+      const result = await retryTodayWinnerEmails();
+
+      if (!result.success) {
+        toast.error(result.error);
+        return;
+      }
+
+      if (result.queued === 0) {
+        toast.success("No failed or pending winner emails remain");
+      } else {
+        toast.success(
+          `Queued ${result.queued} winner email${result.queued === 1 ? "" : "s"} for retry`
+        );
+      }
+      if (result.emailDispatchError) {
+        setEmailDispatchError(result.emailDispatchError);
+        toast.warning("Winner email retry did not dispatch immediately", {
+          description: result.emailDispatchError,
+        });
+      } else {
+        setEmailDispatchError(undefined);
+      }
+      router.refresh();
+    } catch (error) {
+      toast.error("An unexpected error occurred while retrying winner emails");
+      console.error("Retry winner emails error:", error);
+    } finally {
+      setIsRetryingEmails(false);
+    }
+  };
+
+  const emailsSent = winners.filter((w) => w.emailSent).length;
+  const emailsFailed = winners.filter((w) => w.emailSent === false).length;
+  const emailsPending = winners.filter((w) => w.emailSent === undefined).length;
+  const emailsUnsent = emailsFailed + emailsPending;
 
   return (
     <Card className="mx-4 lg:mx-6">
@@ -187,10 +237,6 @@ export function LotteryDrawPanel({
             </div>
 
             {(() => {
-              const emailsSent = winners.filter(w => w.emailSent).length;
-              const emailsFailed = winners.filter(w => w.emailSent === false).length;
-              const emailsPending = winners.filter(w => w.emailSent === undefined).length;
-
               return (
                 <>
                   {emailDispatchError && (
@@ -247,6 +293,23 @@ export function LotteryDrawPanel({
                 </>
               );
             })()}
+
+            {emailsUnsent > 0 && winners.length > 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleRetryEmails}
+                disabled={isRetryingEmails}
+                className="w-fit"
+              >
+                {isRetryingEmails ? (
+                  <IconLoader className="mr-2 size-4 animate-spin" />
+                ) : (
+                  <IconRefresh className="mr-2 size-4" />
+                )}
+                Retry failed emails
+              </Button>
+            )}
 
             {winners.length > 0 && (
               <div className="overflow-hidden rounded-lg border">
