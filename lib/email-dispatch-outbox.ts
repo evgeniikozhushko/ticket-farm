@@ -1,9 +1,11 @@
 import { getEmailDispatchesCollection } from "@/lib/mongodb";
 import { inngest } from "@/inngest/client";
+import { ObjectId } from "mongodb";
 
 const DISPATCHABLE_STATUSES = ["pending", "failed"] as const;
 
 type DispatchWinnerEmailEventInput = {
+  dispatchId?: ObjectId | string;
   orgId?: string;
   date?: string;
   staleBefore?: Date;
@@ -15,9 +17,12 @@ export async function dispatchWinnerEmailEvent(
 ): Promise<boolean> {
   const dispatchesCollection = await getEmailDispatchesCollection();
   const now = new Date();
+  const dispatchId =
+    typeof input.dispatchId === "string" ? new ObjectId(input.dispatchId) : input.dispatchId;
 
   const dispatch = await dispatchesCollection.findOneAndUpdate(
     {
+      ...(dispatchId ? { _id: dispatchId } : {}),
       eventName: "lottery/draw.completed",
       status: { $in: DISPATCHABLE_STATUSES },
       ...(input.orgId ? { orgId: input.orgId } : {}),

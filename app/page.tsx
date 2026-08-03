@@ -1,33 +1,61 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { features } from "@/lib/features";
+import FeatureSection from "@/components/feature-section";
+import { RegistrationPreview } from "@/components/registration-preview";
+import { LotteryDrawPreview } from "@/components/lotterydraw-preview";
 
 export default function RootPage() {
   return (
     <main className="min-h-screen bg-background">
-      <section className="flex min-h-screen flex-col px-6 py-16">
-        <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col justify-center gap-8">
+      <section className="flex min-h-[85vh] items-center px-6 py-16">
+        <div className="mx-auto w-full max-w-5xl">
           <div className="max-w-3xl space-y-5">
             <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
               Ticket Farm · Private Beta
             </p>
+
             <h1 className="text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
-              Daily lottery and ticket pickup tools for community organizations.
+              A complete ticket allocation and pickup platform for community organizations.
             </h1>
+
             <p className="max-w-2xl text-lg text-muted-foreground">
-              Run public signups, draw winners, email tickets, and manage pickup from one
-              multi-tenant dashboard.
+              Manage public registration, fair winner selection, automatic ticket delivery,
+              and pickup from one simple dashboard.
             </p>
           </div>
-          <div className="flex flex-col gap-3 sm:flex-row">
+
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Button asChild size="lg">
               <Link href="/sign-up">Start an organization</Link>
             </Button>
-            <Button asChild size="lg" variant="outline">
-              <Link href="/about">About Ticket Farm</Link>
+
+            <Button asChild size="lg" variant="secondary">
+              <Link href="/sign-in">Sign in</Link>
             </Button>
           </div>
         </div>
-        <footer className="mx-auto mt-12 flex w-full max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
+      </section>
+
+      <div>
+        {features.map((feature, index) => (
+          <FeatureSection
+            key={feature.title}
+            {...feature}
+            reverse={index % 2 === 1}
+            preview={
+              index === 0 ? (
+                <RegistrationPreview />
+              ) : index === 1 ? (
+                <LotteryDrawPreview />
+              ) : undefined
+            }
+          />
+        ))}
+      </div>
+
+      <footer className="px-6 py-8">
+        <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
           <Link href="/privacy" className="hover:text-foreground">
             Privacy
           </Link>
@@ -37,8 +65,8 @@ export default function RootPage() {
           <a href="mailto:hello@ticketfarm.ca" className="hover:text-foreground">
             hello@ticketfarm.ca
           </a>
-        </footer>
-      </section>
+        </div>
+      </footer>
     </main>
   );
 }

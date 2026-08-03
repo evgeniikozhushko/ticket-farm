@@ -1,5 +1,14 @@
 import { getDb } from './mongodb';
-import type { Document } from 'mongodb';
+import type { Db, Document } from 'mongodb';
+
+async function dropIndexIfExists(db: Db, collection: string, name: string) {
+  try {
+    await db.collection(collection).dropIndex(name);
+    console.log(`  ${collection}: dropped ${name}`);
+  } catch {
+    console.log(`  ${collection}: ${name} not present`);
+  }
+}
 
 /**
  * Creates all indexes for Ticket Farm.
@@ -125,17 +134,33 @@ export async function setupIndexes() {
   // EMAIL_DISPATCHES — durable Inngest dispatch outbox
   // ============================================================
 
+  await dropIndexIfExists(db, 'email_dispatches', 'orgId_date_eventName_unique_idx');
+
   await db.collection('email_dispatches').createIndex(
     { orgId: 1, date: 1, eventName: 1 },
-    { unique: true, name: 'orgId_date_eventName_unique_idx', background: true }
+    { name: 'orgId_date_eventName_idx', background: true }
   );
-  console.log("  email_dispatches: { orgId, date, eventName } unique");
+  console.log("  email_dispatches: { orgId, date, eventName }");
 
   await db.collection('email_dispatches').createIndex(
     { status: 1, updatedAt: 1 },
     { name: 'status_updatedAt_idx', background: true }
   );
   console.log("  email_dispatches: { status, updatedAt }");
+
+  await db.collection('email_dispatches').createIndex(
+    { orgId: 1, date: 1, eventName: 1, dispatchKind: 1 },
+    {
+      unique: true,
+      name: 'active_manual_retry_unique_idx',
+      background: true,
+      partialFilterExpression: {
+        dispatchKind: 'manual_retry',
+        status: { $in: ['pending', 'dispatching'] },
+      },
+    }
+  );
+  console.log("  email_dispatches: active manual retry unique guard");
 
   // ============================================================
   // PUBLIC_REGISTRATION_RATE_LIMITS — anti-abuse counters
@@ -169,6 +194,7 @@ export async function dropOldIndexes() {
     { col: 'lotteries',   name: 'date_unique_idx' },
     { col: 'tickets',     name: 'winners_page_idx' },
     { col: 'tickets',     name: 'email_date_idx' },
+    { col: 'email_dispatches', name: 'orgId_date_eventName_unique_idx' },
   ];
   for (const { col, name } of drops) {
     try {
@@ -211,6 +237,7 @@ type RequiredIndex = {
   key: Record<string, 1 | -1>;
   unique?: boolean;
   expireAfterSeconds?: number;
+  partialFilterExpression?: Document;
 };
 
 const REQUIRED_DEPLOY_INDEXES: RequiredIndex[] = [
@@ -238,14 +265,23 @@ const REQUIRED_DEPLOY_INDEXES: RequiredIndex[] = [
   },
   {
     collection: 'email_dispatches',
-    name: 'orgId_date_eventName_unique_idx',
+    name: 'orgId_date_eventName_idx',
     key: { orgId: 1, date: 1, eventName: 1 },
-    unique: true,
   },
   {
     collection: 'email_dispatches',
     name: 'status_updatedAt_idx',
     key: { status: 1, updatedAt: 1 },
+  },
+  {
+    collection: 'email_dispatches',
+    name: 'active_manual_retry_unique_idx',
+    key: { orgId: 1, date: 1, eventName: 1, dispatchKind: 1 },
+    unique: true,
+    partialFilterExpression: {
+      dispatchKind: 'manual_retry',
+      status: { $in: ['pending', 'dispatching'] },
+    },
   },
   {
     collection: 'public_registration_rate_limits',
@@ -265,6 +301,10 @@ function keysMatch(actual: Document | undefined, expected: Record<string, 1 | -1
   return JSON.stringify(actual ?? {}) === JSON.stringify(expected);
 }
 
+function documentsMatch(actual: Document | undefined, expected: Document | undefined): boolean {
+  return JSON.stringify(actual ?? {}) === JSON.stringify(expected ?? {});
+}
+
 export async function verifyRequiredIndexes(): Promise<void> {
   const db = await getDb();
   let missing = 0;
@@ -279,7 +319,8 @@ export async function verifyRequiredIndexes(): Promise<void> {
       keysMatch(found.key, required.key) &&
       (required.unique === undefined || found.unique === required.unique) &&
       (required.expireAfterSeconds === undefined ||
-        found.expireAfterSeconds === required.expireAfterSeconds);
+        found.expireAfterSeconds === required.expireAfterSeconds) &&
+      documentsMatch(found.partialFilterExpression, required.partialFilterExpression);
 
     if (ok) {
       console.log(`  [OK] ${required.collection}.${required.name} present`);
@@ -290,6 +331,7 @@ export async function verifyRequiredIndexes(): Promise<void> {
           key: required.key,
           unique: required.unique,
           expireAfterSeconds: required.expireAfterSeconds,
+          partialFilterExpression: required.partialFilterExpression,
         })}`
       );
     }

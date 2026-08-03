@@ -56,6 +56,18 @@ describe("middleware", () => {
     expect((result as Response).headers.get("location")).toBe("https://ticketfarm.test/onboarding");
   });
 
+  it("protects onboarding so signed-out users cannot fall through to public org routing", async () => {
+    protectMock.mockResolvedValue({ orgId: null });
+    const { default: middleware } = await import("@/proxy");
+
+    const result = await (middleware as unknown as (req: { url: string }) => Promise<unknown>)({
+      url: "https://ticketfarm.test/onboarding",
+    });
+
+    expect(protectMock).toHaveBeenCalledOnce();
+    expect(result).toBeUndefined();
+  });
+
   it("protects platform routes without requiring org context", async () => {
     protectMock.mockResolvedValue({ orgId: null });
     const { default: middleware } = await import("@/proxy");

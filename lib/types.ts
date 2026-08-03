@@ -121,6 +121,7 @@ export interface EmailDispatch {
   orgId: string;
   date: string;
   eventName: "lottery/draw.completed";
+  dispatchKind?: "draw" | "manual_retry";
   payload: {
     orgId: string;
     date: string;
@@ -192,6 +193,17 @@ export type DrawLotteryResult =
       winners: WinnerInfo[];
       winnerCount: number;
       drawnAt: string;
+      emailDispatchError?: string;
+    }
+  | {
+      success: false;
+      error: string;
+    };
+
+export type RetryWinnerEmailsResult =
+  | {
+      success: true;
+      queued: number;
       emailDispatchError?: string;
     }
   | {

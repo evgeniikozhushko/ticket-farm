@@ -19,6 +19,7 @@ const registrantsCollection = vi.hoisted(() => ({
 }));
 const ticketsCollection = vi.hoisted(() => ({
   insertMany: vi.fn(),
+  find: vi.fn(),
 }));
 const dispatchesCollection = vi.hoisted(() => ({
   insertOne: vi.fn(),
@@ -35,6 +36,10 @@ vi.mock("@/lib/orgs", () => ({
 
 vi.mock("@/lib/email-dispatch-outbox", () => ({
   dispatchWinnerEmailEvent: dispatchWinnerEmailEventMock,
+}));
+
+vi.mock("next/cache", () => ({
+  revalidatePath: vi.fn(),
 }));
 
 vi.mock("@/lib/date", () => ({
@@ -71,6 +76,7 @@ describe("drawTodayLottery", () => {
     lotteriesCollection.updateOne.mockReset();
     registrantsCollection.find.mockReset();
     ticketsCollection.insertMany.mockReset().mockResolvedValue({ insertedCount: 2 });
+    ticketsCollection.find.mockReset();
     dispatchesCollection.insertOne.mockReset().mockResolvedValue({ insertedId: new ObjectId() });
   });
 
@@ -148,6 +154,144 @@ describe("drawTodayLottery", () => {
     expect(dispatchesCollection.insertOne).toHaveBeenCalledOnce();
     expect(dispatchWinnerEmailEventMock).toHaveBeenCalledOnce();
     expect(dispatchWinnerEmailEventMock).toHaveBeenCalledWith({ orgId: "org_1", date: "2026-05-28" });
+  });
+
+  it("queues a manual retry from unsent winner tickets", async () => {
+    const dispatchId = new ObjectId();
+    const unsentTickets: Ticket[] = [
+      {
+        orgId: "org_1",
+        name: "Ada",
+        email: "ada@example.com",
+        date: "2026-05-28",
+        ticketNumber: 1,
+        ticketId: "TICKETADA001",
+        pickupTime: "5:30 PM",
+        status: "ACTIVE",
+        generatedAt: new Date("2026-05-28T12:00:00Z"),
+        emailSent: false,
+        emailError: "sender not verified",
+      },
+    ];
+    ticketsCollection.find.mockReturnValue({
+      sort: vi.fn(() => ({
+        toArray: vi.fn().mockResolvedValue(unsentTickets),
+      })),
+    });
+    dispatchesCollection.insertOne.mockResolvedValue({ insertedId: dispatchId });
+    const { retryTodayWinnerEmails } = await loadAction();
+
+    const result = await retryTodayWinnerEmails();
+
+    expect(result).toEqual({ success: true, queued: 1 });
+    expect(requireRoleMock).toHaveBeenCalledWith("org:admin");
+    expect(ticketsCollection.find).toHaveBeenCalledWith({
+      orgId: "org_1",
+      date: "2026-05-28",
+      status: "ACTIVE",
+      emailSent: { $ne: true },
+    });
+    expect(dispatchesCollection.insertOne).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orgId: "org_1",
+        date: "2026-05-28",
+        eventName: "lottery/draw.completed",
+        dispatchKind: "manual_retry",
+        status: "pending",
+        attempts: 0,
+        payload: {
+          orgId: "org_1",
+          date: "2026-05-28",
+          tickets: [
+            expect.objectContaining({
+              email: "ada@example.com",
+              ticketId: "TICKETADA001",
+              emailFromAddress: "hello@ticketfarm.ca",
+              emailFromName: "Ticket Farm",
+            }),
+          ],
+        },
+      })
+    );
+    expect(dispatchWinnerEmailEventMock).toHaveBeenCalledWith({ dispatchId });
+  });
+
+  it("returns a successful no-op when no winner tickets are unsent", async () => {
+    ticketsCollection.find.mockReturnValue({
+      sort: vi.fn(() => ({
+        toArray: vi.fn().mockResolvedValue([]),
+      })),
+    });
+    const { retryTodayWinnerEmails } = await loadAction();
+
+    await expect(retryTodayWinnerEmails()).resolves.toEqual({
+      success: true,
+      queued: 0,
+    });
+    expect(dispatchesCollection.insertOne).not.toHaveBeenCalled();
+    expect(dispatchWinnerEmailEventMock).not.toHaveBeenCalled();
+  });
+
+  it("uses the partial unique index as the active manual retry guard", async () => {
+    ticketsCollection.find.mockReturnValue({
+      sort: vi.fn(() => ({
+        toArray: vi.fn().mockResolvedValue([
+          {
+            orgId: "org_1",
+            name: "Ada",
+            email: "ada@example.com",
+            date: "2026-05-28",
+            ticketNumber: 1,
+            ticketId: "TICKETADA001",
+            pickupTime: "5:30 PM",
+            status: "ACTIVE",
+            generatedAt: new Date("2026-05-28T12:00:00Z"),
+          },
+        ]),
+      })),
+    });
+    dispatchesCollection.insertOne.mockRejectedValue({
+      code: 11000,
+      keyPattern: { orgId: 1, date: 1, eventName: 1, dispatchKind: 1 },
+    });
+    const { retryTodayWinnerEmails } = await loadAction();
+
+    await expect(retryTodayWinnerEmails()).resolves.toEqual({
+      success: false,
+      error: "A winner email retry is already queued or dispatching.",
+    });
+    expect(dispatchWinnerEmailEventMock).not.toHaveBeenCalled();
+  });
+
+  it("reports the old unique outbox index as a migration blocker for manual retries", async () => {
+    ticketsCollection.find.mockReturnValue({
+      sort: vi.fn(() => ({
+        toArray: vi.fn().mockResolvedValue([
+          {
+            orgId: "org_1",
+            name: "Ada",
+            email: "ada@example.com",
+            date: "2026-05-28",
+            ticketNumber: 1,
+            ticketId: "TICKETADA001",
+            pickupTime: "5:30 PM",
+            status: "ACTIVE",
+            generatedAt: new Date("2026-05-28T12:00:00Z"),
+          },
+        ]),
+      })),
+    });
+    dispatchesCollection.insertOne.mockRejectedValue({
+      code: 11000,
+      keyPattern: { orgId: 1, date: 1, eventName: 1 },
+    });
+    const { retryTodayWinnerEmails } = await loadAction();
+
+    await expect(retryTodayWinnerEmails()).resolves.toEqual({
+      success: false,
+      error: "Email retry requires the email dispatch index migration. Run the database setup before retrying.",
+    });
+    expect(dispatchWinnerEmailEventMock).not.toHaveBeenCalled();
   });
 });
 

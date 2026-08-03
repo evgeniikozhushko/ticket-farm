@@ -12,7 +12,11 @@ export default async function SignUpPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center">
-      <SignUp />
+      <SignUp
+        forceRedirectUrl="/onboarding"
+        fallbackRedirectUrl="/onboarding"
+        signInUrl="/sign-in"
+      />
     </div>
   );
 }
