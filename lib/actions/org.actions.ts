@@ -141,6 +141,8 @@ const orgSettingsSchema = z
         message: "Sender address must use the ticketfarm.ca domain.",
       })
       .optional(),
+    pickupTime: z.string().trim().min(1).max(120).optional(),
+    pickupLocation: z.string().trim().max(240).optional(),
   })
   .strict();
 

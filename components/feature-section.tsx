@@ -39,11 +39,11 @@ function FeatureSection({
 
         <div className={reverse ? "md:order-1" : ""}>
           {preview ? (
-            <div className="relative aspect-[4/3] overflow-hidden bg-muted/30">
+            <div className="relative aspect-[4/3] overflow-hidden">
               {preview}
             </div>
           ) : (
-            <div className="relative aspect-[4/3] overflow-hidden bg-muted/30">
+            <div className="relative aspect-[4/3] overflow-hidden">
               <Image
                 src={image ?? ""}
                 alt={imageAlt ?? ""}

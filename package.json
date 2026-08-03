@@ -12,7 +12,8 @@
     "lint": "eslint",
     "test": "vitest run",
     "setup-db": "node --import tsx scripts/setup-db.ts",
-    "check-db": "node --import tsx scripts/check-db-connection.ts"
+    "check-db": "node --import tsx scripts/check-db-connection.ts",
+    "email:dev": "email dev --dir emails --port 3001"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.37.3",
@@ -56,6 +57,7 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
+    "@react-email/preview-server": "5.0.4",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

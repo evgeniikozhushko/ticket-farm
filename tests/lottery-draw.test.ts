@@ -1,6 +1,7 @@
 import { ObjectId } from "mongodb";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Ticket } from "@/lib/types";
+import { DEFAULT_PICKUP_TIME } from "@/lib/pickup";
 
 const requireRoleMock = vi.hoisted(() => vi.fn());
 const getOrganizationMock = vi.hoisted(() => vi.fn());
@@ -150,14 +151,79 @@ describe("drawTodayLottery", () => {
     expect(ticketDocs.map((ticket) => ticket.ticketNumber)).toEqual([1, 2]);
     for (const ticket of ticketDocs) {
       expect(ticket.ticketId).toMatch(/^[0-9A-Z]{12}$/);
+      expect(ticket.pickupTime).toBe(DEFAULT_PICKUP_TIME);
     }
     expect(dispatchesCollection.insertOne).toHaveBeenCalledOnce();
+    expect(dispatchesCollection.insertOne).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          tickets: [
+            expect.objectContaining({
+              pickupTime: DEFAULT_PICKUP_TIME,
+              pickupLocation: undefined,
+            }),
+            expect.objectContaining({
+              pickupTime: DEFAULT_PICKUP_TIME,
+              pickupLocation: undefined,
+            }),
+          ],
+        }),
+      }),
+      expect.any(Object)
+    );
     expect(dispatchWinnerEmailEventMock).toHaveBeenCalledOnce();
     expect(dispatchWinnerEmailEventMock).toHaveBeenCalledWith({ orgId: "org_1", date: "2026-05-28" });
   });
 
+  it("uses configured org pickup details for new tickets and email payloads", async () => {
+    getOrganizationMock.mockResolvedValue({
+      clerkOrgId: "org_1",
+      name: "Ticket Farm",
+      timezone: "America/Edmonton",
+      subscriptionStatus: "active",
+      emailFromAddress: "hello@ticketfarm.ca",
+      emailFromName: "Ticket Farm",
+      pickupTime: "4:00-7:00 PM",
+      pickupLocation: "Canmore Community Centre",
+    });
+    const registrants = [
+      { _id: new ObjectId(), orgId: "org_1", name: "Ada", email: "ada@example.com", date: "2026-05-28", enteredAt: new Date("2026-05-28T12:00:00Z") },
+    ];
+    lotteriesCollection.updateOne.mockResolvedValue({ matchedCount: 1 });
+    registrantsCollection.find.mockReturnValue({ toArray: vi.fn().mockResolvedValue(registrants) });
+    const { drawTodayLottery } = await loadAction();
+
+    const result = await drawTodayLottery(1);
+
+    expect(result.success).toBe(true);
+    const ticketDocs = ticketsCollection.insertMany.mock.calls[0][0] as Omit<Ticket, "_id">[];
+    expect(ticketDocs[0]).toEqual(expect.objectContaining({ pickupTime: "4:00-7:00 PM" }));
+    expect(dispatchesCollection.insertOne).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          tickets: [
+            expect.objectContaining({
+              pickupTime: "4:00-7:00 PM",
+              pickupLocation: "Canmore Community Centre",
+            }),
+          ],
+        }),
+      }),
+      expect.any(Object)
+    );
+  });
+
   it("queues a manual retry from unsent winner tickets", async () => {
     const dispatchId = new ObjectId();
+    getOrganizationMock.mockResolvedValue({
+      clerkOrgId: "org_1",
+      name: "Ticket Farm",
+      timezone: "America/Edmonton",
+      subscriptionStatus: "active",
+      emailFromAddress: "hello@ticketfarm.ca",
+      emailFromName: "Ticket Farm",
+      pickupLocation: "Current Pickup Desk",
+    });
     const unsentTickets: Ticket[] = [
       {
         orgId: "org_1",
@@ -166,7 +232,7 @@ describe("drawTodayLottery", () => {
         date: "2026-05-28",
         ticketNumber: 1,
         ticketId: "TICKETADA001",
-        pickupTime: "5:30 PM",
+        pickupTime: "6:15 PM",
         status: "ACTIVE",
         generatedAt: new Date("2026-05-28T12:00:00Z"),
         emailSent: false,
@@ -206,6 +272,8 @@ describe("drawTodayLottery", () => {
             expect.objectContaining({
               email: "ada@example.com",
               ticketId: "TICKETADA001",
+              pickupTime: "6:15 PM",
+              pickupLocation: "Current Pickup Desk",
               emailFromAddress: "hello@ticketfarm.ca",
               emailFromName: "Ticket Farm",
             }),
@@ -243,7 +311,7 @@ describe("drawTodayLottery", () => {
             date: "2026-05-28",
             ticketNumber: 1,
             ticketId: "TICKETADA001",
-            pickupTime: "5:30 PM",
+            pickupTime: DEFAULT_PICKUP_TIME,
             status: "ACTIVE",
             generatedAt: new Date("2026-05-28T12:00:00Z"),
           },
@@ -274,7 +342,7 @@ describe("drawTodayLottery", () => {
             date: "2026-05-28",
             ticketNumber: 1,
             ticketId: "TICKETADA001",
-            pickupTime: "5:30 PM",
+            pickupTime: DEFAULT_PICKUP_TIME,
             status: "ACTIVE",
             generatedAt: new Date("2026-05-28T12:00:00Z"),
           },

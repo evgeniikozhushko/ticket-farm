@@ -29,7 +29,10 @@ type OrgSettingsFormOrg = Pick<
   | "publicPageEnabled"
   | "emailFromName"
   | "emailFromAddress"
->;
+> & {
+  pickupTime: string;
+  pickupLocation: string;
+};
 
 export function OrgSettingsForm({ org }: { org: OrgSettingsFormOrg }) {
   const [name, setName] = useState(org.name);
@@ -42,6 +45,8 @@ export function OrgSettingsForm({ org }: { org: OrgSettingsFormOrg }) {
   const [emailFromAddress, setEmailFromAddress] = useState(
     org.emailFromAddress
   );
+  const [pickupTime, setPickupTime] = useState(org.pickupTime);
+  const [pickupLocation, setPickupLocation] = useState(org.pickupLocation);
 
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{
@@ -61,6 +66,8 @@ export function OrgSettingsForm({ org }: { org: OrgSettingsFormOrg }) {
       publicPageEnabled,
       emailFromName,
       emailFromAddress,
+      pickupTime,
+      pickupLocation,
     });
 
     setIsLoading(false);
@@ -142,6 +149,30 @@ export function OrgSettingsForm({ org }: { org: OrgSettingsFormOrg }) {
         <Label htmlFor="publicPageEnabled">
           Enable public registration page
         </Label>
+      </div>
+
+      {/* Pickup details */}
+      <div className="space-y-4 rounded-lg border p-4">
+        <p className="text-sm font-medium">Pickup details</p>
+        <div className="space-y-2">
+          <Label htmlFor="pickupTime">Pickup time</Label>
+          <Input
+            id="pickupTime"
+            value={pickupTime}
+            onChange={(e) => setPickupTime(e.target.value)}
+            placeholder="5:30 PM"
+            required
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="pickupLocation">Pickup location</Label>
+          <Input
+            id="pickupLocation"
+            value={pickupLocation}
+            onChange={(e) => setPickupLocation(e.target.value)}
+            placeholder="Community centre front desk"
+          />
+        </div>
       </div>
 
       {/* Email branding */}

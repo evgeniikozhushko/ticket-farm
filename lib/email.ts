@@ -29,7 +29,7 @@ export async function sendWinnerEmail(ticket: EmailTicket): Promise<EmailResult>
     const { data, error } = await resend.emails.send({
       from: `${ticket.emailFromName} <${ticket.emailFromAddress}>`,
       to: [ticket.email],
-      subject: `Congrats! Your ticket #${ticket.ticketNumber} - ${ticket.orgName}`,
+      subject: `Your ticket is ready — Ticket #${ticket.ticketNumber} | ${ticket.orgName}`,
       react: WinnerTicketEmail({
         name: ticket.name,
         ticketNumber: ticket.ticketNumber,

@@ -248,6 +248,8 @@ describe("updateOrganizationSettings", () => {
         publicPageEnabled: false,
         emailFromName: "  Ticket Desk  ",
         emailFromAddress: " HELLO@TICKETFARM.CA ",
+        pickupTime: "  4:00-7:00 PM  ",
+        pickupLocation: "  Canmore Community Centre  ",
       })
     ).resolves.toEqual({ success: true });
 
@@ -261,6 +263,8 @@ describe("updateOrganizationSettings", () => {
           publicPageEnabled: false,
           emailFromName: "Ticket Desk",
           emailFromAddress: "hello@ticketfarm.ca",
+          pickupTime: "4:00-7:00 PM",
+          pickupLocation: "Canmore Community Centre",
           updatedAt: expect.any(Date),
         },
       }
@@ -291,6 +295,25 @@ describe("updateOrganizationSettings", () => {
 
     expect(organizationsCollection.updateOne).not.toHaveBeenCalled();
     expect(invalidateOrgCacheMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid pickup details without writing", async () => {
+    const { updateOrganizationSettings } = await loadActions();
+
+    await expect(updateOrganizationSettings({ pickupTime: "" })).resolves.toEqual({
+      success: false,
+      error: "Invalid organization settings.",
+    });
+    await expect(updateOrganizationSettings({ pickupTime: "x".repeat(121) })).resolves.toEqual({
+      success: false,
+      error: "Invalid organization settings.",
+    });
+    await expect(updateOrganizationSettings({ pickupLocation: "x".repeat(241) })).resolves.toEqual({
+      success: false,
+      error: "Invalid organization settings.",
+    });
+
+    expect(organizationsCollection.updateOne).not.toHaveBeenCalled();
   });
 
   it("rejects invalid timezones without writing", async () => {

@@ -16,6 +16,8 @@ export interface Organization {
   publicPageEnabled: boolean;
   emailFromName: string;
   emailFromAddress: string;     // Beta: verified ticketfarm.ca sender address
+  pickupTime?: string;
+  pickupLocation?: string;
   stripeCustomerId?: string;
   stripePriceId?: string;
   subscriptionStatus: SubscriptionStatus;

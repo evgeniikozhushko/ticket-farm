@@ -9,7 +9,13 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { enterLottery } from '@/lib/actions/lottery.actions'
 
-export function RegistrationForm({ orgSlug }: { orgSlug: string }) {
+export function RegistrationForm({
+  orgSlug,
+  pickupTime,
+}: {
+  orgSlug: string
+  pickupTime: string
+}) {
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [consent, setConsent] = useState(false)
@@ -47,7 +53,7 @@ export function RegistrationForm({ orgSlug }: { orgSlug: string }) {
           </h3>
           <p className="text-balance leading-relaxed text-muted-foreground">
             Results will be announced later today. If you are selected, {"you'll"} receive an email with your ticket and
-            pickup time starting at 5:30 PM.
+            pickup time: {pickupTime}.
           </p>
           <p className="pt-4 text-sm text-muted-foreground">You can close this page now.</p>
         </div>

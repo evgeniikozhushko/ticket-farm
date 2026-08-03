@@ -23,6 +23,7 @@ import { getOrganization } from "@/lib/orgs";
 import { dispatchWinnerEmailEvent } from "@/lib/email-dispatch-outbox";
 import { duplicateErrorIncludesField, isDuplicateKeyError } from "@/lib/mongo-errors";
 import type { EmailTicket } from "@/lib/email";
+import { DEFAULT_PICKUP_TIME } from "@/lib/pickup";
 
 const TICKET_ID_LENGTH = 12;
 const TICKET_ID_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -53,6 +54,7 @@ function buildTicketDocuments(input: {
   selectedWinners: Registrant[];
   date: string;
   drawnAt: Date;
+  pickupTime: string;
 }): Omit<Ticket, "_id">[] {
   return input.selectedWinners.map((winner, index) => ({
     orgId: input.orgId,
@@ -61,7 +63,7 @@ function buildTicketDocuments(input: {
     name: winner.name,
     email: winner.email,
     date: input.date,
-    pickupTime: "5:30 PM",
+    pickupTime: input.pickupTime,
     status: "ACTIVE",
     generatedAt: input.drawnAt,
   }));
@@ -70,6 +72,7 @@ function buildTicketDocuments(input: {
 function buildEmailTickets(input: {
   tickets: Omit<Ticket, "_id">[] | Ticket[];
   orgName: string;
+  pickupLocation?: string;
   emailFromAddress: string;
   emailFromName: string;
 }): EmailTicket[] {
@@ -81,7 +84,7 @@ function buildEmailTickets(input: {
     date: ticket.date,
     pickupTime: ticket.pickupTime,
     orgName: input.orgName,
-    pickupLocation: undefined,
+    pickupLocation: input.pickupLocation,
     emailFromAddress: input.emailFromAddress,
     emailFromName: input.emailFromName,
   }));
@@ -148,7 +151,13 @@ export async function drawTodayLottery(
 
           selectedWinners = shuffleArray(registrants).slice(0, winnerCount);
           const winnerIds = selectedWinners.map((r) => r._id as ObjectId);
-          ticketDocuments = buildTicketDocuments({ orgId, selectedWinners, date, drawnAt });
+          ticketDocuments = buildTicketDocuments({
+            orgId,
+            selectedWinners,
+            date,
+            drawnAt,
+            pickupTime: org.pickupTime ?? DEFAULT_PICKUP_TIME,
+          });
 
           try {
             await ticketsCollection.insertMany(ticketDocuments, { session });
@@ -162,6 +171,7 @@ export async function drawTodayLottery(
           const emailTickets = buildEmailTickets({
             tickets: ticketDocuments,
             orgName: org.name,
+            pickupLocation: org.pickupLocation,
             emailFromAddress: org.emailFromAddress,
             emailFromName: org.emailFromName,
           });
@@ -264,6 +274,7 @@ export async function retryTodayWinnerEmails(): Promise<RetryWinnerEmailsResult>
     const emailTickets = buildEmailTickets({
       tickets: unsentTickets,
       orgName: org.name,
+      pickupLocation: org.pickupLocation,
       emailFromAddress: org.emailFromAddress,
       emailFromName: org.emailFromName,
     });

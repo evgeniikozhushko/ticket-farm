@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { OrgSettingsForm } from "@/components/org-settings-form";
 import { getOrganization } from "@/lib/orgs";
+import { DEFAULT_PICKUP_TIME } from "@/lib/pickup";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,8 @@ export default async function OrgSettingsPage() {
     publicPageEnabled: org.publicPageEnabled,
     emailFromName: org.emailFromName,
     emailFromAddress: org.emailFromAddress,
+    pickupTime: org.pickupTime ?? DEFAULT_PICKUP_TIME,
+    pickupLocation: org.pickupLocation ?? "",
   };
 
   return (
@@ -32,8 +35,8 @@ export default async function OrgSettingsPage() {
             <div>
               <h2 className="text-lg font-semibold">Organization settings</h2>
               <p className="text-sm text-muted-foreground">
-                Update your organization name, slug, timezone, and email
-                branding.
+                Update your organization name, slug, timezone, pickup details,
+                and email branding.
               </p>
             </div>
 
