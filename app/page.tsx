@@ -5,6 +5,7 @@ import FeatureSection from "@/components/feature-section";
 import { RegistrationPreview } from "@/components/registration-preview";
 import { LotteryDrawPreview } from "@/components/lotterydraw-preview";
 import { TicketDeliveryPreview } from "@/components/ticket-delivery-preview";
+import { PickupManagementPreview } from "@/components/pickup-management-preview";
 
 export default async function RootPage() {
   return (
@@ -52,6 +53,8 @@ export default async function RootPage() {
               <LotteryDrawPreview />
             ) : index === 2 ? (
               <TicketDeliveryPreview />
+            ) : index === 3 ? (
+              <PickupManagementPreview />
             ) : undefined)}
           />
         ))}
