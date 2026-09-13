@@ -5,44 +5,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { previewWinners } from "@/lib/preview-winners";
 import {
   IconClock,
   IconTrophy,
   IconUsers,
 } from "@tabler/icons-react";
-
-const previewWinners = [
-  "Maya Chen",
-  "Jordan Brooks",
-  "Sam Patel",
-  "Avery Singh",
-  "Noah Kim",
-  "Emma Rodriguez",
-  "Liam Wilson",
-  "Sophia Lee",
-  "Ethan Park",
-  "Olivia Martin",
-  "Lucas Nguyen",
-  "Isabella Garcia",
-  "Henry Adams",
-  "Amelia Brown",
-  "Benjamin Clark",
-  "Charlotte Davis",
-  "Daniel Evans",
-  "Harper Flores",
-  "Jack Green",
-  "Mia Hall",
-  "Leo Johnson",
-  "Evelyn King",
-  "Owen Lewis",
-  "Camila Moore",
-  "William Nelson",
-  "Grace Ortiz",
-  "Alexander Price",
-  "Chloe Reed",
-  "Matthew Scott",
-  "Zoe Turner",
-] as const;
 
 export function LotteryDrawPreview() {
   const [winnerCount, setWinnerCount] = useState(10);

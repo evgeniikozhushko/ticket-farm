@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { previewWinners } from "@/lib/preview-winners";
 import {
   IconCircleCheck,
   IconPackage,
@@ -8,34 +9,64 @@ import {
   IconX,
 } from "@tabler/icons-react";
 
-const inventory = [
-  { label: "Issued", value: 24 },
-  { label: "Picked up", value: 17 },
-  { label: "Canceled", value: 2 },
-  { label: "Remaining", value: 5 },
+const pickupStatuses = [
+  "ACTIVE",
+  "CHECKED_IN",
+  "CANCELED",
+  "CHECKED_IN",
+  "ACTIVE",
+  "CHECKED_IN",
+  "ACTIVE",
+  "CANCELED",
+  "CHECKED_IN",
+  "ACTIVE",
+  "CHECKED_IN",
+  "CANCELED",
+  "ACTIVE",
+  "CHECKED_IN",
+  "CHECKED_IN",
+  "ACTIVE",
+  "CANCELED",
+  "CHECKED_IN",
+  "ACTIVE",
+  "CHECKED_IN",
+  "ACTIVE",
+  "CANCELED",
+  "CHECKED_IN",
+  "ACTIVE",
+  "CHECKED_IN",
+  "CANCELED",
+  "ACTIVE",
+  "CHECKED_IN",
+  "ACTIVE",
+  "CHECKED_IN",
 ] as const;
 
-const winners = [
+const winners = previewWinners.map((name, index) => {
+  const [firstName, lastName] = name.toLowerCase().split(" ");
+
+  return {
+    name,
+    email: `${firstName}.${lastName}@example.com`,
+    ticketNumber: index + 24,
+    ticketId: `TF-${String(index + 24).padStart(4, "0")}`,
+    status: pickupStatuses[index],
+  };
+});
+
+const inventory = [
+  { label: "Issued", value: winners.length },
   {
-    name: "Maya Chen",
-    email: "maya.chen@example.com",
-    ticketNumber: 7,
-    ticketId: "M8C4R2T9K6Q1",
-    status: "ACTIVE",
+    label: "Picked up",
+    value: winners.filter((winner) => winner.status === "CHECKED_IN").length,
   },
   {
-    name: "Jordan Brooks",
-    email: "jordan.brooks@example.com",
-    ticketNumber: 12,
-    ticketId: "B7N2P5W8D4L3",
-    status: "CHECKED_IN",
+    label: "Canceled",
+    value: winners.filter((winner) => winner.status === "CANCELED").length,
   },
   {
-    name: "Priya Shah",
-    email: "priya.shah@example.com",
-    ticketNumber: 19,
-    ticketId: "S3H9V6A2F8J5",
-    status: "CANCELED",
+    label: "Remaining",
+    value: winners.filter((winner) => winner.status === "ACTIVE").length,
   },
 ] as const;
 
@@ -93,7 +124,7 @@ export function PickupManagementPreview() {
         ))}
       </dl>
 
-      <div className="shrink-0 rounded-lg border bg-background xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
+      <div className="max-h-48 shrink-0 overflow-y-auto rounded-lg border bg-background xl:max-h-none xl:min-h-0 xl:flex-1">
         <div className="divide-y">
           {winners.map((winner) => (
             <div
@@ -156,14 +187,14 @@ export function PickupManagementPreview() {
             Remaining inventory
           </p>
           <p className="truncate text-xs leading-4 text-muted-foreground">
-            5 of 24 tickets are still available
+            {inventory[3].value} of {inventory[0].value} tickets are still available
           </p>
         </div>
         <Badge
           variant="secondary"
           className="text-xs tabular-nums"
         >
-          5
+          {inventory[3].value}
         </Badge>
       </div>
     </div>
