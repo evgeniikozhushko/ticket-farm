@@ -9,22 +9,23 @@ import { PickupManagementPreview } from "@/components/pickup-management-preview"
 
 export default async function RootPage() {
   return (
-    <main className="min-h-screen bg-background">
-
+    <main className="min-h-svh bg-background">
       {/* Hero */}
-      <section className="flex min-h-[85vh] items-center px-6 py-16">
+      <section className="flex min-h-[70svh] items-center px-4 py-12 sm:px-6 sm:py-16 md:min-h-[85vh]">
         <div className="mx-auto w-full max-w-5xl">
           <div className="max-w-3xl space-y-5">
             <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
               Ticket Farm · Private Beta
             </p>
 
-            <h1 className="text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
-              A complete ticket allocation and pickup platform for community organizations.
+            <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-5xl">
+              A complete ticket allocation and pickup platform for community
+              organizations.
             </h1>
 
-            <p className="max-w-2xl text-lg text-muted-foreground">
-              Manage public registration, fair winner selection, automatic ticket delivery, and pickup from one simple dashboard.
+            <p className="max-w-2xl text-base text-muted-foreground sm:text-lg">
+              Manage public registration, fair winner selection, automatic
+              ticket delivery, and pickup from one simple dashboard.
             </p>
           </div>
 
@@ -47,20 +48,33 @@ export default async function RootPage() {
             key={feature.title}
             {...feature}
             reverse={index % 2 === 1}
-            preview={index === 0 ? (
-              <RegistrationPreview />
-            ) : (index === 1 ? (
-              <LotteryDrawPreview />
-            ) : index === 2 ? (
-              <TicketDeliveryPreview />
-            ) : index === 3 ? (
-              <PickupManagementPreview />
-            ) : undefined)}
+            previewClassName={
+              index === 0
+                ? "aspect-auto overflow-visible py-1 sm:py-2 xl:flex xl:aspect-[4/3] xl:items-center xl:overflow-hidden xl:py-0"
+                : index === 1
+                  ? "aspect-auto overflow-visible xl:aspect-[4/3] xl:overflow-hidden"
+                : index === 2
+                  ? "aspect-auto overflow-visible xl:aspect-[4/3] xl:overflow-hidden"
+                : index === 3
+                  ? "aspect-auto overflow-visible xl:aspect-[4/3] xl:overflow-hidden"
+                : ""
+            }
+            preview={
+              index === 0 ? (
+                <RegistrationPreview />
+              ) : index === 1 ? (
+                <LotteryDrawPreview />
+              ) : index === 2 ? (
+                <TicketDeliveryPreview />
+              ) : index === 3 ? (
+                <PickupManagementPreview />
+              ) : undefined
+            }
           />
         ))}
       </div>
 
-      <footer className="px-6 py-8">
+      <footer className="px-4 py-8 sm:px-6">
         <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
           <Link href="/privacy" className="hover:text-foreground">
             Privacy
@@ -68,7 +82,10 @@ export default async function RootPage() {
           <Link href="/terms" className="hover:text-foreground">
             Terms
           </Link>
-          <a href="mailto:hello@ticketfarm.ca" className="hover:text-foreground">
+          <a
+            href="mailto:hello@ticketfarm.ca"
+            className="hover:text-foreground"
+          >
             hello@ticketfarm.ca
           </a>
         </div>

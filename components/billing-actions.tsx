@@ -10,6 +10,7 @@ interface BillingActionsProps {
   label: string;
   variant?: "default" | "outline" | "secondary";
   action: "checkout" | "portal";
+  className?: string;
 }
 
 export function BillingActionButton({
@@ -18,6 +19,7 @@ export function BillingActionButton({
   label,
   variant = "default",
   action,
+  className,
 }: BillingActionsProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -62,6 +64,7 @@ export function BillingActionButton({
         size="sm"
         onClick={handleClick}
         disabled={isLoading || (action === "portal" && !stripeCustomerId)}
+        className={className}
       >
         {isLoading ? "Redirecting..." : label}
       </Button>

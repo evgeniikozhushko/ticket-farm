@@ -11,7 +11,7 @@ export default async function SignUpPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
+    <div className="flex min-h-svh items-start justify-center px-4 py-8 sm:items-center sm:py-12">
       <SignUp
         forceRedirectUrl="/onboarding"
         fallbackRedirectUrl="/onboarding"

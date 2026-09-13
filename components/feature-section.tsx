@@ -8,6 +8,7 @@ type FeatureSectionProps = {
   image?: string;
   imageAlt?: string;
   preview?: ReactNode;
+  previewClassName?: string;
   reverse?: boolean;
 };
 
@@ -18,32 +19,35 @@ function FeatureSection({
   image,
   imageAlt,
   preview,
+  previewClassName,
   reverse = false,
 }: FeatureSectionProps) {
   return (
-    <section className="px-6">
-      <div className="mx-auto grid min-h-[680px] w-full max-w-6xl items-center gap-12 py-24 md:grid-cols-2 md:gap-20">
+    <section className="px-4 sm:px-6">
+      <div className="mx-auto grid w-full max-w-6xl items-center gap-8 py-12 sm:py-16 md:min-h-[680px] md:grid-cols-2 md:gap-20 md:py-24">
         <div className={reverse ? "md:order-2" : ""}>
           <p className="mb-4 text-sm font-medium text-muted-foreground">
             {eyebrow}
           </p>
 
-          <h2 className="max-w-xl text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+          <h2 className="max-w-xl text-2xl font-semibold tracking-tight text-foreground sm:text-4xl">
             {title}
           </h2>
 
-          <p className="mt-6 max-w-lg text-lg leading-8 text-muted-foreground">
+          <p className="mt-4 max-w-lg text-base leading-7 text-muted-foreground sm:mt-6 sm:text-lg sm:leading-8">
             {description}
           </p>
         </div>
 
-        <div className={reverse ? "md:order-1" : ""}>
+        <div className={`min-w-0 ${reverse ? "md:order-1" : ""}`}>
           {preview ? (
-            <div className="relative aspect-[4/3] overflow-hidden">
+            <div
+              className={`relative aspect-[4/3] min-h-0 overflow-hidden ${previewClassName ?? ""}`}
+            >
               {preview}
             </div>
           ) : (
-            <div className="relative aspect-[4/3] overflow-hidden">
+            <div className="relative aspect-[4/3] min-h-0 overflow-hidden">
               <Image
                 src={image ?? ""}
                 alt={imageAlt ?? ""}

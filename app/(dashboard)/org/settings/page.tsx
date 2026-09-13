@@ -32,31 +32,31 @@ export default async function OrgSettingsPage() {
     <DashboardShell title="Organization Settings">
       <div className="flex flex-1 flex-col">
         <div className="flex flex-col gap-4 p-4 md:gap-6 md:p-6">
-            <div>
-              <h2 className="text-lg font-semibold">Organization settings</h2>
-              <p className="text-sm text-muted-foreground">
-                Update your organization name, slug, timezone, pickup details,
-                and email branding.
-              </p>
-            </div>
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold">Organization settings</h2>
+            <p className="break-words text-sm text-muted-foreground">
+              Update your organization name, slug, timezone, pickup details, and
+              email branding.
+            </p>
+          </div>
 
-            <OrgSettingsForm org={orgSettings} />
+          <OrgSettingsForm org={orgSettings} />
 
-            {/* Plan info */}
-            <div className="max-w-lg rounded-lg border p-4 text-sm">
-              <p className="font-medium">Current plan</p>
-              <p className="mt-1 text-muted-foreground capitalize">
-                {org.planName} — up to{" "}
-                {org.maxRegistrantsPerDay === null
-                  ? "unlimited"
-                  : org.maxRegistrantsPerDay}{" "}
-                registrants/day
-              </p>
-              <p className="mt-1 text-muted-foreground">
-                Status:{" "}
-                <span className="capitalize">{org.subscriptionStatus}</span>
-              </p>
-            </div>
+          {/* Plan info */}
+          <div className="max-w-lg rounded-lg border p-4 text-sm">
+            <p className="font-medium">Current plan</p>
+            <p className="mt-1 break-words text-muted-foreground capitalize">
+              {org.planName} — up to{" "}
+              {org.maxRegistrantsPerDay === null
+                ? "unlimited"
+                : org.maxRegistrantsPerDay}{" "}
+              registrants/day
+            </p>
+            <p className="mt-1 break-words text-muted-foreground">
+              Status:{" "}
+              <span className="capitalize">{org.subscriptionStatus}</span>
+            </p>
+          </div>
         </div>
       </div>
     </DashboardShell>

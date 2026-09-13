@@ -2,15 +2,38 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { IconAlertTriangle, IconTrophy, IconLoader, IconMail, IconMailOff, IconRefresh } from "@tabler/icons-react";
+import {
+  Table,
+  TableHeader,
+  TableRow,
+  TableHead,
+  TableBody,
+  TableCell,
+} from "@/components/ui/table";
+import {
+  IconAlertTriangle,
+  IconTrophy,
+  IconLoader,
+  IconMail,
+  IconMailOff,
+  IconRefresh,
+} from "@tabler/icons-react";
 import { toast } from "sonner";
-import { drawTodayLottery, retryTodayWinnerEmails } from "@/lib/actions/lottery-draw.actions";
+import {
+  drawTodayLottery,
+  retryTodayWinnerEmails,
+} from "@/lib/actions/lottery-draw.actions";
 import type { WinnerInfo, LotteryStatus } from "@/lib/types";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -33,12 +56,16 @@ export function LotteryDrawPanel({
   const [status, setStatus] = useState<LotteryStatus>(initialStatus);
   const [winners, setWinners] = useState<WinnerInfo[]>(initialWinners);
   const [winnerCount, setWinnerCount] = useState(
-    defaultWinnerCount > 0 ? defaultWinnerCount : Math.min(10, totalRegistrants)
+    defaultWinnerCount > 0
+      ? defaultWinnerCount
+      : Math.min(10, totalRegistrants),
   );
   const [isLoading, setIsLoading] = useState(false);
   const [isRetryingEmails, setIsRetryingEmails] = useState(false);
   const [lastDrawnAt, setLastDrawnAt] = useState<string | undefined>(drawnAt);
-  const [emailDispatchError, setEmailDispatchError] = useState<string | undefined>();
+  const [emailDispatchError, setEmailDispatchError] = useState<
+    string | undefined
+  >();
 
   useEffect(() => {
     setStatus(initialStatus);
@@ -54,7 +81,9 @@ export function LotteryDrawPanel({
     }
 
     if (winnerCount > totalRegistrants) {
-      toast.error(`Cannot draw ${winnerCount} winners from ${totalRegistrants} registrants`);
+      toast.error(
+        `Cannot draw ${winnerCount} winners from ${totalRegistrants} registrants`,
+      );
       return;
     }
 
@@ -70,21 +99,30 @@ export function LotteryDrawPanel({
         setEmailDispatchError(result.emailDispatchError);
 
         // Show success message with email status
-        const emailsSent = result.winners.filter(w => w.emailSent).length;
-        const emailsFailed = result.winners.filter(w => w.emailSent === false).length;
+        const emailsSent = result.winners.filter((w) => w.emailSent).length;
+        const emailsFailed = result.winners.filter(
+          (w) => w.emailSent === false,
+        ).length;
 
         toast.success(`Successfully drew ${result.winnerCount} winners!`);
 
         if (emailsSent > 0) {
-          toast.success(`Emails sent to ${emailsSent} winner${emailsSent !== 1 ? 's' : ''}`, {
-            icon: "📧",
-          });
+          toast.success(
+            `Emails sent to ${emailsSent} winner${emailsSent !== 1 ? "s" : ""}`,
+            {
+              icon: "📧",
+            },
+          );
         }
 
         if (emailsFailed > 0) {
-          toast.error(`Failed to send ${emailsFailed} email${emailsFailed !== 1 ? 's' : ''}`, {
-            description: "Winners were selected but some emails could not be sent",
-          });
+          toast.error(
+            `Failed to send ${emailsFailed} email${emailsFailed !== 1 ? "s" : ""}`,
+            {
+              description:
+                "Winners were selected but some emails could not be sent",
+            },
+          );
         }
 
         if (result.emailDispatchError) {
@@ -134,7 +172,7 @@ export function LotteryDrawPanel({
         toast.success("No failed or pending winner emails remain");
       } else {
         toast.success(
-          `Queued ${result.queued} winner email${result.queued === 1 ? "" : "s"} for retry`
+          `Queued ${result.queued} winner email${result.queued === 1 ? "" : "s"} for retry`,
         );
       }
       if (result.emailDispatchError) {
@@ -160,19 +198,22 @@ export function LotteryDrawPanel({
   const emailsUnsent = emailsFailed + emailsPending;
 
   return (
-    <Card className="mx-4 lg:mx-6">
+    <Card className="mx-4 min-w-0 lg:mx-6">
       <CardHeader>
-        <div className="flex items-start justify-between">
-          <div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
             <CardTitle>Lottery Draw</CardTitle>
-            <CardDescription>
+            <CardDescription className="break-words">
               {status === "OPEN"
                 ? "Select number of winners and run the draw"
                 : `Lottery drawn on ${lastDrawnAt ? formatDate(lastDrawnAt) : "today"}`}
             </CardDescription>
           </div>
           {status === "LOTTERY_DRAWN" && (
-            <Badge variant="outline" className="border-blue-500 text-blue-700 dark:text-blue-400">
+            <Badge
+              variant="outline"
+              className="border-blue-500 text-blue-700 dark:text-blue-400"
+            >
               <IconTrophy className="mr-1 size-3" />
               Drawn
             </Badge>
@@ -198,14 +239,21 @@ export function LotteryDrawPanel({
                     min="1"
                     max={totalRegistrants}
                     value={winnerCount}
-                    onChange={(e) => setWinnerCount(parseInt(e.target.value) || 0)}
+                    onChange={(e) =>
+                      setWinnerCount(parseInt(e.target.value) || 0)
+                    }
                     className="max-w-xs"
                   />
                   <p className="text-sm text-muted-foreground">
                     Maximum: {totalRegistrants} (total registrants)
                   </p>
                 </div>
-                <Button onClick={handleDraw} disabled={isLoading} size="lg">
+                <Button
+                  onClick={handleDraw}
+                  disabled={isLoading}
+                  size="lg"
+                  className="w-full sm:w-auto"
+                >
                   {isLoading ? (
                     <>
                       <IconLoader className="mr-2 size-4 animate-spin" />
@@ -225,12 +273,20 @@ export function LotteryDrawPanel({
           <div className="space-y-4">
             <div className="rounded-lg bg-muted/50 p-4">
               <p className="text-sm text-muted-foreground">
-                <strong className="text-foreground">{winners.length} winners</strong> selected from{" "}
-                <strong className="text-foreground">{totalRegistrants} registrants</strong>
+                <strong className="text-foreground">
+                  {winners.length} winners
+                </strong>{" "}
+                selected from{" "}
+                <strong className="text-foreground">
+                  {totalRegistrants} registrants
+                </strong>
                 {lastDrawnAt && (
                   <>
                     {" "}
-                    at <strong className="text-foreground">{formatTime(lastDrawnAt)}</strong>
+                    at{" "}
+                    <strong className="text-foreground">
+                      {formatTime(lastDrawnAt)}
+                    </strong>
                   </>
                 )}
               </p>
@@ -243,9 +299,12 @@ export function LotteryDrawPanel({
                     <Alert className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/20">
                       <IconAlertTriangle className="size-4 text-amber-600 dark:text-amber-400" />
                       <AlertDescription className="text-amber-800 dark:text-amber-200">
-                        Winners were selected, but email dispatch did not queue. The retry job may recover it.
+                        Winners were selected, but email dispatch did not queue.
+                        The retry job may recover it.
                         <br />
-                        <span className="mt-1 block text-sm">{emailDispatchError}</span>
+                        <span className="mt-1 block text-sm">
+                          {emailDispatchError}
+                        </span>
                       </AlertDescription>
                     </Alert>
                   )}
@@ -254,7 +313,8 @@ export function LotteryDrawPanel({
                     <Alert className="border-green-500/50 bg-green-50 dark:bg-green-950/20">
                       <IconMail className="size-4 text-green-600 dark:text-green-400" />
                       <AlertDescription className="text-green-800 dark:text-green-200">
-                        Emails successfully sent to {emailsSent} winner{emailsSent !== 1 ? 's' : ''}
+                        Emails successfully sent to {emailsSent} winner
+                        {emailsSent !== 1 ? "s" : ""}
                       </AlertDescription>
                     </Alert>
                   )}
@@ -263,11 +323,13 @@ export function LotteryDrawPanel({
                     <Alert className="border-red-500/50 bg-red-50 dark:bg-red-950/20">
                       <IconMailOff className="size-4 text-red-600 dark:text-red-400" />
                       <AlertDescription className="text-red-800 dark:text-red-200">
-                        Failed to send emails to {emailsFailed} winner{emailsFailed !== 1 ? 's' : ''}.
-                        Winners were selected successfully but email delivery failed.
+                        Failed to send emails to {emailsFailed} winner
+                        {emailsFailed !== 1 ? "s" : ""}. Winners were selected
+                        successfully but email delivery failed.
                         <br />
                         <span className="text-sm mt-1 block">
-                          Using (hello@ticketfarm.ca). Emails only send to verified addresses in your{" "}
+                          Using (hello@ticketfarm.ca). Emails only send to
+                          verified addresses in your{" "}
                           <a
                             href="https://resend.com/emails"
                             target="_blank"
@@ -282,14 +344,17 @@ export function LotteryDrawPanel({
                     </Alert>
                   )}
 
-                  {emailsPending > 0 && emailsSent === 0 && emailsFailed === 0 && (
-                    <Alert>
-                      <IconMail className="size-4" />
-                      <AlertDescription>
-                        Email status not yet available for {emailsPending} winner{emailsPending !== 1 ? 's' : ''}
-                      </AlertDescription>
-                    </Alert>
-                  )}
+                  {emailsPending > 0 &&
+                    emailsSent === 0 &&
+                    emailsFailed === 0 && (
+                      <Alert>
+                        <IconMail className="size-4" />
+                        <AlertDescription>
+                          Email status not yet available for {emailsPending}{" "}
+                          winner{emailsPending !== 1 ? "s" : ""}
+                        </AlertDescription>
+                      </Alert>
+                    )}
                 </>
               );
             })()}
@@ -300,7 +365,7 @@ export function LotteryDrawPanel({
                 variant="outline"
                 onClick={handleRetryEmails}
                 disabled={isRetryingEmails}
-                className="w-fit"
+                className="w-full sm:w-fit"
               >
                 {isRetryingEmails ? (
                   <IconLoader className="mr-2 size-4 animate-spin" />
@@ -312,52 +377,110 @@ export function LotteryDrawPanel({
             )}
 
             {winners.length > 0 && (
-              <div className="overflow-hidden rounded-lg border">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted">
-                      <TableHead className="w-12">#</TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Ticket #</TableHead>
-                      <TableHead>Ticket ID</TableHead>
-                      <TableHead className="w-24 text-center">Email Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {winners.map((winner, index) => (
-                      <TableRow key={winner._id}>
-                        <TableCell className="font-medium">{index + 1}</TableCell>
-                        <TableCell>{winner.name}</TableCell>
-                        <TableCell className="text-muted-foreground">{winner.email}</TableCell>
-                        <TableCell className="font-mono font-semibold text-primary">
-                          {winner.ticketNumber
-                            ? String(winner.ticketNumber).padStart(3, "0")
-                            : "—"}
-                        </TableCell>
-                        <TableCell className="font-mono text-sm text-muted-foreground">
-                          {winner.ticketId || "—"}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          {winner.emailSent === true ? (
-                            <IconMail
-                              className="inline-block size-4 text-green-600 dark:text-green-400"
-                              title="Email sent successfully"
-                            />
-                          ) : winner.emailSent === false ? (
-                            <IconMailOff
-                              className="inline-block size-4 text-red-600 dark:text-red-400"
-                              title={winner.emailError || "Email failed to send"}
-                            />
-                          ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
+              <>
+                <div className="space-y-3 md:hidden">
+                  {winners.map((winner, index) => (
+                    <div key={winner._id} className="rounded-lg border p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="break-words font-medium">
+                            {winner.name}
+                          </p>
+                          <p className="break-all text-sm text-muted-foreground">
+                            {winner.email}
+                          </p>
+                        </div>
+                        <span className="shrink-0 text-sm font-medium text-muted-foreground">
+                          #{index + 1}
+                        </span>
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                        <div className="min-w-0">
+                          <p className="text-xs text-muted-foreground">
+                            Ticket #
+                          </p>
+                          <p className="font-mono font-semibold text-primary">
+                            {winner.ticketNumber
+                              ? String(winner.ticketNumber).padStart(3, "0")
+                              : "—"}
+                          </p>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs text-muted-foreground">Email</p>
+                          <p className="font-medium">
+                            {winner.emailSent === true
+                              ? "Sent"
+                              : winner.emailSent === false
+                                ? "Failed"
+                                : "Pending"}
+                          </p>
+                        </div>
+                      </div>
+                      <p className="mt-3 break-all font-mono text-xs text-muted-foreground">
+                        Ticket ID: {winner.ticketId || "—"}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                <div className="hidden overflow-x-auto rounded-lg border md:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted">
+                        <TableHead className="w-12">#</TableHead>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Ticket #</TableHead>
+                        <TableHead>Ticket ID</TableHead>
+                        <TableHead className="w-24 text-center">
+                          Email Status
+                        </TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                    </TableHeader>
+                    <TableBody>
+                      {winners.map((winner, index) => (
+                        <TableRow key={winner._id}>
+                          <TableCell className="font-medium">
+                            {index + 1}
+                          </TableCell>
+                          <TableCell className="min-w-40">
+                            {winner.name}
+                          </TableCell>
+                          <TableCell className="min-w-56 break-all text-muted-foreground">
+                            {winner.email}
+                          </TableCell>
+                          <TableCell className="font-mono font-semibold text-primary">
+                            {winner.ticketNumber
+                              ? String(winner.ticketNumber).padStart(3, "0")
+                              : "—"}
+                          </TableCell>
+                          <TableCell className="min-w-48 break-all font-mono text-sm text-muted-foreground">
+                            {winner.ticketId || "—"}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {winner.emailSent === true ? (
+                              <IconMail
+                                className="inline-block size-4 text-green-600 dark:text-green-400"
+                                title="Email sent successfully"
+                              />
+                            ) : winner.emailSent === false ? (
+                              <IconMailOff
+                                className="inline-block size-4 text-red-600 dark:text-red-400"
+                                title={
+                                  winner.emailError || "Email failed to send"
+                                }
+                              />
+                            ) : (
+                              <span className="text-xs text-muted-foreground">
+                                —
+                              </span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
             )}
           </div>
         )}

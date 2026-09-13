@@ -1,41 +1,23 @@
 "use client";
 import { useState } from "react";
 
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { previewWinners } from "@/lib/preview-winners";
 import {
   IconClock,
   IconTrophy,
   IconUsers,
 } from "@tabler/icons-react";
 
-
 export function LotteryDrawPreview() {
-
   const [winnerCount, setWinnerCount] = useState(10);
-  const [registrants, setRegistrants] = useState([
-    "Maya Chen",
-    "Jordan Brooks",
-    "Sam Patel",
-    "Avery Singh",
-    "Noah Kim",
-  ]);
 
   return (
-    <div className="h-full rounded-xl border bg-card p-4 shadow-sm">
-      {/* <div className="flex h-full flex-col gap-4 overflow-hidden"> */}
-      <div className="flex h-full flex-col gap-4 overflow-y-auto pr-1">
+    <div className="h-auto rounded-xl border bg-card p-4 shadow-sm xl:h-full">
+      <div className="flex h-auto flex-col gap-4 xl:h-full xl:overflow-y-auto xl:pr-1">
         <div className="shrink-0 space-y-4">
           {/* header */}
           <div className="flex items-start justify-between gap-4">
@@ -89,19 +71,9 @@ export function LotteryDrawPreview() {
           </div>
         </div>
 
-        {/* scrollable names field */}
-        <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border p-3">
+        <div className="max-h-64 shrink-0 overflow-y-auto rounded-lg border p-3 xl:max-h-none xl:min-h-0 xl:flex-1">
           <div className="space-y-2">
-            {[
-              "Maya Chen",
-              "Jordan Brooks",
-              "Sam Patel",
-              "Avery Singh",
-              "Noah Kim",
-              "Emma Rodriguez",
-              "Liam Wilson",
-              "Sophia Lee",
-            ].map((name, index) => (
+            {previewWinners.map((name, index) => (
               <div
                 key={name}
                 className="flex items-center justify-between gap-3 text-sm"
@@ -117,7 +89,6 @@ export function LotteryDrawPreview() {
           </div>
         </div>
 
-        {/* button always visible */}
         <Button type="button" className="shrink-0 w-full">
           <IconTrophy className="mr-2 size-4" />
           Run Lottery Draw

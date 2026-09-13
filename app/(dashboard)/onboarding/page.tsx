@@ -12,12 +12,13 @@ export default async function OnboardingPage() {
 
   if (result.status === "needs-clerk-org") {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
+      <main className="flex min-h-svh flex-col items-center justify-start bg-background px-4 py-8 sm:justify-center sm:py-12">
         <div className="w-full max-w-md space-y-6 text-center">
           <div className="space-y-2">
             <h1 className="text-2xl font-bold">Create your organization</h1>
             <p className="text-muted-foreground">
-              Your account is signed in, but it is not attached to an organization yet.
+              Your account is signed in, but it is not attached to an
+              organization yet.
             </p>
           </div>
           <div className="flex justify-center">
@@ -32,7 +33,7 @@ export default async function OnboardingPage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
+    <main className="flex min-h-svh flex-col items-center justify-start bg-background px-4 py-8 sm:justify-center sm:py-12">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
           <h1 className="text-2xl font-bold">Set up your organization</h1>

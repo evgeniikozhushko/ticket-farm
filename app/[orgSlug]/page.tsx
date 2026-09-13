@@ -21,10 +21,12 @@ export default async function OrgRegistrationPage({
   const today = getTodayDateString(org.timezone);
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
+    <main className="flex min-h-svh flex-col items-center justify-start bg-background px-4 py-8 sm:justify-center sm:py-12">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
-          <h1 className="text-3xl font-bold tracking-tight">{org.name}</h1>
+          <h1 className="break-words text-3xl font-bold tracking-tight">
+            {org.name}
+          </h1>
           <p className="mt-2 text-muted-foreground">{today} Daily Lottery</p>
         </div>
         <RegistrationForm
@@ -32,7 +34,10 @@ export default async function OrgRegistrationPage({
           pickupTime={org.pickupTime ?? DEFAULT_PICKUP_TIME}
         />
         <p className="text-center text-sm text-muted-foreground">
-          <a href={`/${orgSlug}/winners`} className="underline underline-offset-4 hover:text-foreground">
+          <a
+            href={`/${orgSlug}/winners`}
+            className="underline underline-offset-4 hover:text-foreground"
+          >
             View today&apos;s winners
           </a>
         </p>

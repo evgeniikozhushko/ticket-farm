@@ -39,11 +39,11 @@ export function OrgSettingsForm({ org }: { org: OrgSettingsFormOrg }) {
   const [slug, setSlug] = useState(org.slug);
   const [timezone, setTimezone] = useState(org.timezone);
   const [publicPageEnabled, setPublicPageEnabled] = useState(
-    org.publicPageEnabled
+    org.publicPageEnabled,
   );
   const [emailFromName, setEmailFromName] = useState(org.emailFromName);
   const [emailFromAddress, setEmailFromAddress] = useState(
-    org.emailFromAddress
+    org.emailFromAddress,
   );
   const [pickupTime, setPickupTime] = useState(org.pickupTime);
   const [pickupLocation, setPickupLocation] = useState(org.pickupLocation);
@@ -85,7 +85,7 @@ export function OrgSettingsForm({ org }: { org: OrgSettingsFormOrg }) {
   const slugChanged = slug !== org.slug;
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 max-w-lg">
+    <form onSubmit={handleSubmit} className="max-w-lg space-y-6">
       {/* Organization name */}
       <div className="space-y-2">
         <Label htmlFor="name">Organization name</Label>
@@ -108,7 +108,7 @@ export function OrgSettingsForm({ org }: { org: OrgSettingsFormOrg }) {
           }
           required
         />
-        <p className="text-xs text-muted-foreground">
+        <p className="break-all text-xs text-muted-foreground">
           Registration page:{" "}
           <strong>ticketfarm.ca/{slug || "your-slug"}</strong>
         </p>
@@ -138,15 +138,18 @@ export function OrgSettingsForm({ org }: { org: OrgSettingsFormOrg }) {
       </div>
 
       {/* Public page toggle */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-start gap-3">
         <input
           type="checkbox"
           id="publicPageEnabled"
           checked={publicPageEnabled}
           onChange={(e) => setPublicPageEnabled(e.target.checked)}
-          className="h-4 w-4 rounded border-input"
+          className="mt-0.5 h-4 w-4 shrink-0 rounded border-input"
         />
-        <Label htmlFor="publicPageEnabled">
+        <Label
+          htmlFor="publicPageEnabled"
+          className="min-w-0 break-words leading-relaxed"
+        >
           Enable public registration page
         </Label>
       </div>
@@ -204,7 +207,7 @@ export function OrgSettingsForm({ org }: { org: OrgSettingsFormOrg }) {
 
       {message && (
         <div
-          className={`rounded-lg p-3 text-sm ${
+          className={`break-words rounded-lg p-3 text-sm ${
             message.type === "success"
               ? "bg-green-50 text-green-700"
               : "bg-destructive/10 text-destructive"
@@ -214,7 +217,7 @@ export function OrgSettingsForm({ org }: { org: OrgSettingsFormOrg }) {
         </div>
       )}
 
-      <Button type="submit" disabled={isLoading}>
+      <Button type="submit" disabled={isLoading} className="w-full sm:w-fit">
         {isLoading ? "Saving..." : "Save settings"}
       </Button>
     </form>

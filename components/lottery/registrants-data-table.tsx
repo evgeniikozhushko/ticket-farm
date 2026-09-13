@@ -1,11 +1,28 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
+import {
+  Table,
+  TableHeader,
+  TableRow,
+  TableHead,
+  TableBody,
+  TableCell,
+} from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { IconSearch, IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
+import {
+  IconSearch,
+  IconChevronLeft,
+  IconChevronRight,
+} from "@tabler/icons-react";
 import type { SerializedRegistrant } from "@/lib/types";
 
 interface RegistrantsDataTableProps {
@@ -14,10 +31,14 @@ interface RegistrantsDataTableProps {
 
 const ITEMS_PER_PAGE = 10;
 
-export function RegistrantsDataTable({ registrants }: RegistrantsDataTableProps) {
+export function RegistrantsDataTable({
+  registrants,
+}: RegistrantsDataTableProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [sortColumn, setSortColumn] = useState<"name" | "email" | "enteredAt">("enteredAt");
+  const [sortColumn, setSortColumn] = useState<"name" | "email" | "enteredAt">(
+    "enteredAt",
+  );
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
   // Filter registrants based on search query
@@ -28,7 +49,7 @@ export function RegistrantsDataTable({ registrants }: RegistrantsDataTableProps)
     return registrants.filter(
       (r) =>
         r.name.toLowerCase().includes(query) ||
-        r.email.toLowerCase().includes(query)
+        r.email.toLowerCase().includes(query),
     );
   }, [registrants, searchQuery]);
 
@@ -85,17 +106,18 @@ export function RegistrantsDataTable({ registrants }: RegistrantsDataTableProps)
   };
 
   return (
-    <Card className="mx-4 lg:mx-6">
+    <Card className="mx-4 min-w-0 lg:mx-6">
       <CardHeader>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
+          <div className="min-w-0">
             <CardTitle>Today&apos;s Registrants</CardTitle>
-            <CardDescription>
-              {filteredRegistrants.length} {filteredRegistrants.length === 1 ? "registrant" : "registrants"}
+            <CardDescription className="break-words">
+              {filteredRegistrants.length}{" "}
+              {filteredRegistrants.length === 1 ? "registrant" : "registrants"}
               {searchQuery && ` matching "${searchQuery}"`}
             </CardDescription>
           </div>
-          <div className="relative max-w-xs">
+          <div className="relative w-full sm:max-w-xs">
             <IconSearch className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Search by name or email..."
@@ -120,7 +142,37 @@ export function RegistrantsDataTable({ registrants }: RegistrantsDataTableProps)
           </div>
         ) : (
           <>
-            <div className="overflow-hidden rounded-lg border">
+            <div className="space-y-3 md:hidden">
+              {paginatedRegistrants.map((registrant, index) => {
+                const globalIndex =
+                  (currentPage - 1) * ITEMS_PER_PAGE + index + 1;
+                return (
+                  <div
+                    key={registrant._id?.toString()}
+                    className="rounded-lg border p-4"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="break-words font-medium">
+                          {registrant.name}
+                        </p>
+                        <p className="break-all text-sm text-muted-foreground">
+                          {registrant.email}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-sm font-medium text-muted-foreground">
+                        #{globalIndex}
+                      </span>
+                    </div>
+                    <p className="mt-3 text-sm text-muted-foreground">
+                      Entered at {formatTime(registrant.enteredAt)}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="hidden overflow-x-auto rounded-lg border md:block">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted sticky top-0 z-10">
@@ -147,14 +199,17 @@ export function RegistrantsDataTable({ registrants }: RegistrantsDataTableProps)
                 </TableHeader>
                 <TableBody>
                   {paginatedRegistrants.map((registrant, index) => {
-                    const globalIndex = (currentPage - 1) * ITEMS_PER_PAGE + index + 1;
+                    const globalIndex =
+                      (currentPage - 1) * ITEMS_PER_PAGE + index + 1;
                     return (
                       <TableRow key={registrant._id?.toString()}>
                         <TableCell className="font-medium text-muted-foreground">
                           {globalIndex}
                         </TableCell>
-                        <TableCell className="font-medium">{registrant.name}</TableCell>
-                        <TableCell className="text-muted-foreground">
+                        <TableCell className="min-w-40 font-medium">
+                          {registrant.name}
+                        </TableCell>
+                        <TableCell className="min-w-56 break-all text-muted-foreground">
                           {registrant.email}
                         </TableCell>
                         <TableCell className="text-right text-sm text-muted-foreground">
@@ -169,16 +224,17 @@ export function RegistrantsDataTable({ registrants }: RegistrantsDataTableProps)
 
             {/* Pagination Controls */}
             {totalPages > 1 && (
-              <div className="mt-4 flex items-center justify-between">
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-sm text-muted-foreground">
                   Page {currentPage} of {totalPages}
                 </p>
-                <div className="flex gap-2">
+                <div className="grid grid-cols-2 gap-2 sm:flex">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                     disabled={currentPage === 1}
+                    className="w-full sm:w-auto"
                   >
                     <IconChevronLeft className="size-4" />
                     Previous
@@ -186,8 +242,11 @@ export function RegistrantsDataTable({ registrants }: RegistrantsDataTableProps)
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    onClick={() =>
+                      setCurrentPage((p) => Math.min(totalPages, p + 1))
+                    }
                     disabled={currentPage === totalPages}
+                    className="w-full sm:w-auto"
                   >
                     Next
                     <IconChevronRight className="size-4" />
