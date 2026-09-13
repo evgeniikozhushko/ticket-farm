@@ -51,6 +51,8 @@ export default async function RootPage() {
             previewClassName={
               index === 0
                 ? "aspect-auto overflow-visible py-1 sm:py-2 xl:flex xl:aspect-[4/3] xl:items-center xl:overflow-hidden xl:py-0"
+                : index === 1
+                  ? "aspect-auto overflow-visible xl:aspect-[4/3] xl:overflow-hidden"
                 : index === 3
                   ? "aspect-auto overflow-visible xl:aspect-[4/3] xl:overflow-hidden"
                 : ""
