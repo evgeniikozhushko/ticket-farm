@@ -50,9 +50,9 @@ const statusStyles = {
 
 export function PickupManagementPreview() {
   return (
-    <div className="flex h-full min-h-0 flex-col gap-1 overflow-hidden rounded-xl border bg-card p-2 shadow-sm sm:gap-3 sm:p-4">
-      <div className="flex shrink-0 items-center gap-3">
-        <div className="hidden min-w-0 sm:block">
+    <div className="flex h-auto flex-col gap-4 overflow-hidden rounded-xl border bg-card p-4 shadow-sm xl:h-full xl:min-h-0 xl:gap-3">
+      <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="min-w-0">
           <h3 className="truncate text-sm font-semibold">
             Today&apos;s pickups
           </h3>
@@ -62,51 +62,51 @@ export function PickupManagementPreview() {
         </div>
 
         <div className="relative min-w-0 flex-1">
-          <IconSearch className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground sm:size-4" />
+          <IconSearch className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="search"
             placeholder="Search name, email, ticket number, or ticket ID"
             aria-label="Find a winner by name, email, ticket number, or ticket ID"
-            className="h-8 pl-8 text-xs disabled:cursor-default disabled:opacity-100 sm:h-9"
+            className="h-10 pl-9 text-sm disabled:cursor-default disabled:opacity-100 xl:h-9"
             disabled
           />
         </div>
       </div>
 
-      <dl className="grid shrink-0 grid-cols-4 overflow-hidden rounded-lg border bg-muted/20">
+      <dl className="grid shrink-0 grid-cols-2 overflow-hidden rounded-lg border bg-muted/20 sm:grid-cols-4">
         {inventory.map((item, index) => (
           <div
             key={item.label}
             className={
               index === 0
-                ? "min-w-0 px-1 py-1 sm:px-2 sm:py-2"
-                : "min-w-0 border-l px-1 py-1 sm:px-2 sm:py-2"
+                ? "min-w-0 px-2 py-2"
+                : "min-w-0 border-l px-2 py-2"
             }
           >
-            <dd className="text-sm font-semibold leading-4 tabular-nums sm:text-lg sm:leading-5">
+            <dd className="text-xl font-semibold leading-6 tabular-nums">
               {item.value}
             </dd>
-            <dt className="truncate text-[9px] leading-3 text-muted-foreground sm:text-[11px]">
+            <dt className="truncate text-xs leading-4 text-muted-foreground">
               {item.label}
             </dt>
           </div>
         ))}
       </dl>
 
-      <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border bg-background">
+      <div className="shrink-0 rounded-lg border bg-background xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
         <div className="divide-y">
           {winners.map((winner) => (
             <div
               key={winner.ticketId}
-              className="flex min-h-0 items-center gap-1.5 px-2 py-1 sm:gap-3 sm:px-3 sm:py-2"
+              className="flex items-center gap-3 px-3 py-3 xl:py-2"
             >
               <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-medium leading-4 sm:text-sm">
+                <p className="truncate text-sm font-medium leading-5">
                   {winner.name}
                 </p>
-                <p className="truncate text-[9px] leading-3 text-muted-foreground sm:text-xs sm:leading-4">
+                <p className="truncate text-xs leading-4 text-muted-foreground">
                   Ticket #{winner.ticketNumber}
-                  <span className="hidden sm:inline">
+                  <span className="hidden xl:inline">
                     {" "}
                     &middot; {winner.ticketId} &middot; {winner.email}
                   </span>
@@ -115,7 +115,7 @@ export function PickupManagementPreview() {
 
               <Badge
                 variant="outline"
-                className={`px-1.5 py-0 text-[8px] leading-4 sm:text-[10px] ${statusStyles[winner.status]}`}
+                className={`px-2 py-0.5 text-xs leading-4 ${statusStyles[winner.status]}`}
               >
                 {winner.status}
               </Badge>
@@ -126,21 +126,21 @@ export function PickupManagementPreview() {
                     type="button"
                     size="icon-sm"
                     variant="outline"
-                    className="size-7 border-green-500/40 text-green-700 disabled:opacity-100 dark:text-green-300 sm:size-8"
+                    className="size-8 border-green-500/40 text-green-700 disabled:opacity-100 dark:text-green-300"
                     aria-label={`Confirm pickup for ${winner.name}`}
                     disabled
                   >
-                    <IconCircleCheck className="size-3.5 sm:size-4" />
+                    <IconCircleCheck className="size-4" />
                   </Button>
                   <Button
                     type="button"
                     size="icon-sm"
                     variant="outline"
-                    className="size-7 border-red-500/40 text-red-700 disabled:opacity-100 dark:text-red-300 sm:size-8"
+                    className="size-8 border-red-500/40 text-red-700 disabled:opacity-100 dark:text-red-300"
                     aria-label={`Cancel ticket for ${winner.name}`}
                     disabled
                   >
-                    <IconX className="size-3.5 sm:size-4" />
+                    <IconX className="size-4" />
                   </Button>
                 </div>
               )}
@@ -149,19 +149,19 @@ export function PickupManagementPreview() {
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-2 rounded-lg border bg-muted/30 px-2 py-1.5 sm:px-3 sm:py-2">
-        <IconPackage className="size-3.5 shrink-0 text-muted-foreground sm:size-4" />
+      <div className="flex shrink-0 items-center gap-3 rounded-lg border bg-muted/30 p-3 xl:py-2">
+        <IconPackage className="size-4 shrink-0 text-muted-foreground" />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[10px] font-medium leading-3 sm:text-xs sm:leading-4">
+          <p className="truncate text-sm font-medium leading-5">
             Remaining inventory
           </p>
-          <p className="truncate text-[9px] leading-3 text-muted-foreground sm:text-[11px]">
+          <p className="truncate text-xs leading-4 text-muted-foreground">
             5 of 24 tickets are still available
           </p>
         </div>
         <Badge
           variant="secondary"
-          className="text-[9px] tabular-nums sm:text-xs"
+          className="text-xs tabular-nums"
         >
           5
         </Badge>
