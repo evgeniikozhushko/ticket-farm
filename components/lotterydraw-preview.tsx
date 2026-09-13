@@ -11,6 +11,38 @@ import {
   IconUsers,
 } from "@tabler/icons-react";
 
+const previewWinners = [
+  "Maya Chen",
+  "Jordan Brooks",
+  "Sam Patel",
+  "Avery Singh",
+  "Noah Kim",
+  "Emma Rodriguez",
+  "Liam Wilson",
+  "Sophia Lee",
+  "Ethan Park",
+  "Olivia Martin",
+  "Lucas Nguyen",
+  "Isabella Garcia",
+  "Henry Adams",
+  "Amelia Brown",
+  "Benjamin Clark",
+  "Charlotte Davis",
+  "Daniel Evans",
+  "Harper Flores",
+  "Jack Green",
+  "Mia Hall",
+  "Leo Johnson",
+  "Evelyn King",
+  "Owen Lewis",
+  "Camila Moore",
+  "William Nelson",
+  "Grace Ortiz",
+  "Alexander Price",
+  "Chloe Reed",
+  "Matthew Scott",
+  "Zoe Turner",
+] as const;
 
 export function LotteryDrawPreview() {
   const [winnerCount, setWinnerCount] = useState(10);
@@ -71,18 +103,9 @@ export function LotteryDrawPreview() {
           </div>
         </div>
 
-        <div className="shrink-0 rounded-lg border p-3 xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
+        <div className="max-h-64 shrink-0 overflow-y-auto rounded-lg border p-3 xl:max-h-none xl:min-h-0 xl:flex-1">
           <div className="space-y-2">
-            {[
-              "Maya Chen",
-              "Jordan Brooks",
-              "Sam Patel",
-              "Avery Singh",
-              "Noah Kim",
-              "Emma Rodriguez",
-              "Liam Wilson",
-              "Sophia Lee",
-            ].map((name, index) => (
+            {previewWinners.map((name, index) => (
               <div
                 key={name}
                 className="flex items-center justify-between gap-3 text-sm"
