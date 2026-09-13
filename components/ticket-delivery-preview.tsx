@@ -102,7 +102,7 @@ const deliveryStatuses = [
 
 export function TicketDeliveryPreview() {
   return (
-    <div className="h-full rounded-xl border bg-card p-4 shadow-sm">
+    <div className="h-[34rem] rounded-xl border bg-card p-4 shadow-sm xl:h-full">
       <Carousel
         opts={{ loop: true }}
         className="h-full min-h-0 [&>div]:h-full"
