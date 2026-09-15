@@ -1,3 +1,42 @@
+# Transactional registration admission
+
+## Approved plan
+
+- [x] Inspect registration, draw transaction, indexes, and disposable database tests.
+- [x] Commit quota and registration together; preserve limiter policy and refund definitive failures once.
+- [x] Handle full/closed, missing counters, duplicate races, retries, and uncertain commits.
+- [x] Update unit tests and add local replica-set concurrency/rollback coverage.
+- [x] Run full local replica-set suite, lint, type checking, production build, and review diff.
+
+Pre-launch assumption: no historical counter reconciliation or production migration. Deployment must verify unique registration `(orgId, email, date)` and lottery `(orgId, date)` indexes. Production deployment/index status remains unverified.
+
+## Review — transactional admission
+
+### Changes
+
+- Registration and quota increment commit together on the lottery document used by the draw; callbacks allow driver retries and retain one registrant ID.
+- Initialization cannot reopen/reset a lottery. Legacy missing counters count scoped registrations within the transaction. Full, zero-cap, closed, and unavailable responses are distinct.
+- Both limiter outcomes settle before admission. Confirmed consumptions are refunded once on definitive failure, including partial limiter failure; refund errors cannot replace the response. No quota compensation remains.
+- Uncertain commits use the attempt ID for primary/majority confirmation. Unconfirmed outcomes retain rate-limit consumption and return an explicit uncertainty response.
+- Added 11 disposable local replica-set tests and updated 32 registration unit tests. Both controlled draw orderings and competing admissions assert the committed outbox recipient snapshot.
+
+### Verification
+
+- `TICKET_FARM_TEST_MONGODB_URI='mongodb://127.0.0.1:27187/?replicaSet=ticketfarmtest' pnpm test` — **25 files, 164 tests passed**, including all integration tests.
+- `pnpm lint` — passed.
+- `pnpm exec tsc --noEmit --incremental false` — passed.
+- `pnpm build` — passed.
+- `git diff --check` — passed; final code/test diff reviewed.
+- Initial integration connection attempts timed out because no local server was running. Started a fresh localhost-only disposable replica set; successful tests created/dropped random test databases. No application database was used.
+
+### Deployment requirements and limits
+
+- Before deployment, inspect installed indexes directly (`registrants.listIndexes()` and `lotteries.listIndexes()`) and require unique `{ orgId: 1, email: 1, date: 1 }` and `{ orgId: 1, date: 1 }`, respectively. Integration setup creates both. The existing index verifier alone does not verify these foundational constraints; also verify the existing global unique ticket reference index at deployment.
+- Deployment and installed production indexes remain unverified. No production migration or historical counter reconciliation performed; the pre-launch assumption remains explicit.
+- Commit uncertainty is covered with driver-error mocks; real replica-set tests cover transaction conflict retries and rollback, not network-failure injection. Network failure can still prevent a definitive client answer even though quota and registration remain atomic.
+- Existing rate-limit policy, response shape, organization/date scoping, and `CLAUDE.md` user changes preserved. No dependencies added, commits made, or deployment performed.
+- This resolves the registration/draw admission and separate quota/insert findings (#3 and #4); earlier task reviews below are historical. Other readiness findings remain out of scope.
+
 # Private draw results and redemption
 
 ## Approved implementation
