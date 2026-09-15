@@ -83,7 +83,7 @@ export async function getTodayWinners(): Promise<WinnerInfo[]> {
     }
 
     const [winners, tickets] = await Promise.all([
-      registrantsCollection.find({ _id: { $in: lottery.winnerRegistrantIds } }).toArray(),
+      registrantsCollection.find({ orgId, _id: { $in: lottery.winnerRegistrantIds } }).toArray(),
       ticketsCollection.find({ orgId, date }).sort({ ticketNumber: 1 }).toArray(),
     ]);
 

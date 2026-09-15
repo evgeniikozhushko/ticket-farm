@@ -2,6 +2,7 @@ import { DashboardShell } from "@/components/dashboard-shell";
 import { LotteryStatsCards } from "@/components/lottery/lottery-stats-cards";
 import { LotteryDrawPanel } from "@/components/lottery/lottery-draw-panel";
 import { RegistrantsDataTable } from "@/components/lottery/registrants-data-table";
+import { TicketRedemptionPanel } from "@/components/lottery/ticket-redemption-panel";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import {
@@ -34,7 +35,10 @@ export default async function LotteryAdminPage() {
   };
 
   const serializedRegistrants: SerializedRegistrant[] = registrants.map((r) => ({
-    ...r,
+    orgId: r.orgId,
+    name: r.name,
+    email: r.email,
+    date: r.date,
     _id: r._id?.toString() ?? "",
     enteredAt: r.enteredAt.toISOString(),
   }));
@@ -58,6 +62,8 @@ export default async function LotteryAdminPage() {
               defaultWinnerCount={serializedStats.maxTicketsAvailable}
               drawnAt={serializedStats.drawnAt}
             />
+
+            <TicketRedemptionPanel />
 
             {/* All Registrants Table */}
             <RegistrantsDataTable registrants={serializedRegistrants} />

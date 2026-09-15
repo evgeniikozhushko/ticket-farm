@@ -151,6 +151,19 @@ export async function drawTodayLottery(
 
           selectedWinners = shuffleArray(registrants).slice(0, winnerCount);
           const winnerIds = selectedWinners.map((r) => r._id as ObjectId);
+          const winnerIdSet = new Set(winnerIds.map((id) => id.toString()));
+          // Persist the exact draw snapshot in the same transaction as tickets.
+          // Retries must never infer participation from a later registration query.
+          const nonWinners = registrants
+            .filter((r) => !winnerIdSet.has(r._id!.toString()))
+            .map((r) => ({
+              registrantId: r._id!.toString(),
+              email: r.email,
+              date,
+              orgName: org.name,
+              emailFromAddress: org.emailFromAddress,
+              emailFromName: org.emailFromName,
+            }));
           ticketDocuments = buildTicketDocuments({
             orgId,
             selectedWinners,
@@ -194,7 +207,7 @@ export async function drawTodayLottery(
               date,
               eventName: "lottery/draw.completed",
               dispatchKind: "draw",
-              payload: { orgId, date, tickets: emailTickets },
+              payload: { orgId, date, tickets: emailTickets, nonWinners },
               status: "pending",
               attempts: 0,
               createdAt: now,
@@ -262,12 +275,27 @@ export async function retryTodayWinnerEmails(): Promise<RetryWinnerEmailsResult>
     const ticketsCollection = await getTicketsCollection();
     const dispatchesCollection = await getEmailDispatchesCollection();
 
+    const originalDraw = await dispatchesCollection.findOne({
+      orgId, date, eventName: "lottery/draw.completed", dispatchKind: "draw",
+    });
+    const nonWinnerSnapshot = originalDraw?.payload.nonWinners ?? [];
+    const registrantsCollection = await getRegistrantsCollection();
+    const unsentNonWinners = nonWinnerSnapshot.length
+      ? await registrantsCollection.find({
+          orgId, date,
+          _id: { $in: nonWinnerSnapshot.map((r) => new ObjectId(r.registrantId)) },
+          nonWinnerEmailSent: { $ne: true },
+        }).toArray()
+      : [];
+    const unsentIds = new Set(unsentNonWinners.map((r) => r._id!.toString()));
+    const nonWinners = nonWinnerSnapshot.filter((r) => unsentIds.has(r.registrantId));
+
     const unsentTickets = await ticketsCollection
       .find({ orgId, date, status: "ACTIVE", emailSent: { $ne: true } })
       .sort({ ticketNumber: 1 })
       .toArray();
 
-    if (unsentTickets.length === 0) {
+    if (unsentTickets.length === 0 && nonWinners.length === 0) {
       return { success: true, queued: 0 };
     }
 
@@ -287,7 +315,7 @@ export async function retryTodayWinnerEmails(): Promise<RetryWinnerEmailsResult>
         date,
         eventName: "lottery/draw.completed",
         dispatchKind: "manual_retry",
-        payload: { orgId, date, tickets: emailTickets },
+        payload: { orgId, date, tickets: emailTickets, ...(nonWinners.length ? { nonWinners } : {}) },
         status: "pending",
         attempts: 0,
         createdAt: now,
@@ -317,7 +345,7 @@ export async function retryTodayWinnerEmails(): Promise<RetryWinnerEmailsResult>
 
     return {
       success: true,
-      queued: unsentTickets.length,
+      queued: unsentTickets.length + nonWinners.length,
       ...(emailDispatchError ? { emailDispatchError } : {}),
     };
   } catch (err) {

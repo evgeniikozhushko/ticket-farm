@@ -169,10 +169,10 @@ export function LotteryDrawPanel({
       }
 
       if (result.queued === 0) {
-        toast.success("No failed or pending winner emails remain");
+        toast.success("No failed or pending result emails remain");
       } else {
         toast.success(
-          `Queued ${result.queued} winner email${result.queued === 1 ? "" : "s"} for retry`,
+          `Queued ${result.queued} result email${result.queued === 1 ? "" : "s"} for retry`,
         );
       }
       if (result.emailDispatchError) {
@@ -195,7 +195,6 @@ export function LotteryDrawPanel({
   const emailsSent = winners.filter((w) => w.emailSent).length;
   const emailsFailed = winners.filter((w) => w.emailSent === false).length;
   const emailsPending = winners.filter((w) => w.emailSent === undefined).length;
-  const emailsUnsent = emailsFailed + emailsPending;
 
   return (
     <Card className="mx-4 min-w-0 lg:mx-6">
@@ -359,7 +358,7 @@ export function LotteryDrawPanel({
               );
             })()}
 
-            {emailsUnsent > 0 && winners.length > 0 && (
+            {winners.length > 0 && (
               <Button
                 type="button"
                 variant="outline"
@@ -372,7 +371,7 @@ export function LotteryDrawPanel({
                 ) : (
                   <IconRefresh className="mr-2 size-4" />
                 )}
-                Retry failed emails
+                Retry unsent result emails
               </Button>
             )}
 

@@ -44,7 +44,7 @@ export default function PrivacyPage() {
         <section className="space-y-3">
           <h2 className="text-xl font-semibold">How we use email</h2>
           <p className="text-muted-foreground">
-            We send transactional emails only: account verification, winner
+            We send transactional emails only: account verification, lottery result
             notifications, and ticket delivery. We do not send marketing email from
             Ticket Farm. Organizations may contact their own registrants through their
             own channels; that&apos;s not handled by us.
@@ -54,7 +54,9 @@ export default function PrivacyPage() {
         <section className="space-y-3">
           <h2 className="text-xl font-semibold">Who can see your data</h2>
           <p className="text-muted-foreground">
-            Each organization is isolated. Admins of an organization can see their own
+            Lottery results are communicated directly by email. Winner information
+            is not publicly displayed, and there is no public winners list.
+            Each organization is isolated. Authenticated staff and admins can see their own
             org&apos;s registrants and tickets — nothing from other orgs. Ticket Farm
             staff can access data when necessary for support or to investigate abuse.
           </p>

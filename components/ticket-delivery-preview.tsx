@@ -195,8 +195,9 @@ export function TicketDeliveryPreview() {
                     Pickup instructions
                   </h4>
                   <p className="mt-5 text-sm leading-6 text-muted-foreground">
-                    Bring this email, ticket number, or ticket reference when
-                    you collect your ticket. Please arrive during the pickup
+                    Present the private Reference from this email to redeem
+                    your ticket. The ticket number alone is not pickup proof.
+                    Please arrive during the pickup
                     time shown above. If you can no longer attend, contact{" "}
                     {previewTicket.orgName} as soon as possible.
                   </p>

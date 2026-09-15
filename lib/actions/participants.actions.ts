@@ -190,8 +190,9 @@ export async function getParticipantHistory(
       ticketNumber: ticket?.ticketNumber,
       ticketId: ticket?.ticketId,
       ticketStatus: ticket?.status,
-      emailSent: ticket?.emailSent,
-      emailError: ticket?.emailError,
+      checkedInAt: ticket?.checkedInAt?.toISOString(),
+      emailSent: ticket ? ticket.emailSent : registrant.nonWinnerEmailSent,
+      emailError: ticket ? ticket.emailError : registrant.nonWinnerEmailError,
     };
   });
 }

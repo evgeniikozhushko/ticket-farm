@@ -52,7 +52,7 @@ export function RegistrationForm({
             {"You're"} entered in {"today's"} lottery!
           </h3>
           <p className="text-balance leading-relaxed text-muted-foreground">
-            Results will be announced later today. If you are selected, {"you'll"} receive an email with your ticket and
+            After the draw, {"you'll"} receive your result by email whether or not you are selected. Winners receive their ticket and
             pickup time: {pickupTime}.
           </p>
           <p className="pt-4 text-sm text-muted-foreground">You can close this page now.</p>
@@ -114,9 +114,10 @@ export function RegistrationForm({
         {isLoading ? "Entering tickets..." : "Get today's ticket"}
       </Button>
 
-      {/* <p className="text-center text-sm leading-relaxed text-muted-foreground">
-        If you are selected, you will receive an email with your ticket and pickup time.
-      </p> */}
+      <p className="text-center text-sm leading-relaxed text-muted-foreground">
+        Results are sent by email. Winner information is not published publicly.
+        Organization staff can access your registration and draw information.
+      </p>
     </form>
   )
 }

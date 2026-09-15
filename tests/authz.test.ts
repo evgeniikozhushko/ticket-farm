@@ -7,6 +7,11 @@ vi.mock("@clerk/nextjs/server", () => ({
 }));
 
 describe("requireRole", () => {
+  it("rejects unrecognized organization roles", async () => {
+    authMock.mockResolvedValue({ userId: "user_1", orgId: "org_1", orgRole: "org:guest" });
+    const { requireRole } = await import("@/lib/authz");
+    await expect(requireRole("org:member")).rejects.toThrow("staff role required");
+  });
   beforeEach(() => {
     authMock.mockReset();
     vi.unstubAllEnvs();

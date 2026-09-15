@@ -25,6 +25,9 @@ export async function requireRole(minRole: OrgRole): Promise<{ userId: string; o
   }
 
   // Role hierarchy check: org:admin satisfies org:member requirement
+  if (orgRole !== "org:member" && orgRole !== "org:admin") {
+    throw new Error("Forbidden: organization staff role required");
+  }
   if (minRole === "org:admin" && orgRole !== "org:admin") {
     throw new Error("Forbidden: admin role required");
   }

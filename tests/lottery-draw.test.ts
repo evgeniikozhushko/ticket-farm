@@ -24,6 +24,7 @@ const ticketsCollection = vi.hoisted(() => ({
 }));
 const dispatchesCollection = vi.hoisted(() => ({
   insertOne: vi.fn(),
+  findOne: vi.fn(),
 }));
 
 vi.mock("@/lib/authz", () => ({
@@ -79,6 +80,7 @@ describe("drawTodayLottery", () => {
     ticketsCollection.insertMany.mockReset().mockResolvedValue({ insertedCount: 2 });
     ticketsCollection.find.mockReset();
     dispatchesCollection.insertOne.mockReset().mockResolvedValue({ insertedId: new ObjectId() });
+    dispatchesCollection.findOne.mockReset().mockResolvedValue(null);
   });
 
   it("returns already drawn when the draw lock cannot be acquired", async () => {

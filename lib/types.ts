@@ -39,6 +39,9 @@ export interface Registrant {
   email: string;
   date: string;        // "YYYY-MM-DD"
   enteredAt: Date;
+  nonWinnerEmailSent?: boolean;
+  nonWinnerEmailSentAt?: Date;
+  nonWinnerEmailError?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -75,6 +78,7 @@ export interface Ticket {
   date: string;         // "YYYY-MM-DD"
   pickupTime: string;
   status: TicketStatus;
+  checkedInAt?: Date | null;
   generatedAt: Date;
   emailSent?: boolean;
   emailSentAt?: Date;
@@ -104,6 +108,7 @@ export type ParticipantHistoryEntry = {
   ticketNumber?: number;
   ticketId?: string;
   ticketStatus?: TicketStatus;
+  checkedInAt?: string;
   emailSent?: boolean;
   emailError?: string;
 };
@@ -128,6 +133,7 @@ export interface EmailDispatch {
     orgId: string;
     date: string;
     tickets: import("@/lib/email").EmailTicket[];
+    nonWinners?: import("@/lib/email").NonWinnerEmail[];
   };
   status: "pending" | "dispatching" | "dispatched" | "failed";
   attempts: number;

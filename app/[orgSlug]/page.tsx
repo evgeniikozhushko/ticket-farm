@@ -33,14 +33,6 @@ export default async function OrgRegistrationPage({
           orgSlug={orgSlug}
           pickupTime={org.pickupTime ?? DEFAULT_PICKUP_TIME}
         />
-        <p className="text-center text-sm text-muted-foreground">
-          <a
-            href={`/${orgSlug}/winners`}
-            className="underline underline-offset-4 hover:text-foreground"
-          >
-            View today&apos;s winners
-          </a>
-        </p>
       </div>
     </main>
   );

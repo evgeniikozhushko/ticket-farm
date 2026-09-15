@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { EmailTicket, EmailResult } from "@/lib/email";
+import type { EmailTicket, EmailResult, NonWinnerEmail } from "@/lib/email";
+
+const nonWinnerNotifications = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/non-winner-notifications", () => ({ sendNonWinnerNotifications: nonWinnerNotifications }));
 
 const sendBulkWinnerEmailsMock = vi.hoisted(() => vi.fn());
 const ticketsCollection = vi.hoisted(() => ({
@@ -53,7 +56,7 @@ function findResult(rows: unknown[]) {
   };
 }
 
-async function runFunction() {
+async function runFunction(nonWinners: NonWinnerEmail[] = []) {
   vi.resetModules();
   const { sendWinnerEmailsFunction } = await import("@/inngest/functions/send-winner-emails");
   const handler = sendWinnerEmailsFunction as unknown as (input: {
@@ -63,6 +66,7 @@ async function runFunction() {
         orgId: string;
         date: string;
         tickets: EmailTicket[];
+        nonWinners: NonWinnerEmail[];
       };
     };
   }) => Promise<unknown>;
@@ -73,6 +77,7 @@ async function runFunction() {
         orgId: "org_1",
         date: "2026-05-28",
         tickets: eventTickets,
+        nonWinners,
       },
     },
   });
@@ -83,6 +88,23 @@ describe("sendWinnerEmailsFunction", () => {
     sendBulkWinnerEmailsMock.mockReset();
     ticketsCollection.find.mockReset();
     ticketsCollection.bulkWrite.mockReset().mockResolvedValue({ modifiedCount: 1 });
+    nonWinnerNotifications.mockReset().mockResolvedValue({ sent: 0, skipped: 0, failed: 0 });
+  });
+
+  it("dispatches non-winners even when every winner email was already sent", async () => {
+    ticketsCollection.find.mockReturnValue(findResult(eventTickets.map((ticket) => ({ ...ticket, emailSent: true }))));
+    const nonWinner = { registrantId: "507f1f77bcf86cd799439011", email: "other@example.com", date: "2026-05-28", orgName: "Org", emailFromAddress: "hello@ticketfarm.ca", emailFromName: "Org" };
+    nonWinnerNotifications.mockResolvedValue({ sent: 1, skipped: 0, failed: 0 });
+    expect(await runFunction([nonWinner])).toMatchObject({ sent: 1, skipped: 2 });
+    expect(nonWinnerNotifications).toHaveBeenCalledWith("org_1", "2026-05-28", [nonWinner]);
+    expect(sendBulkWinnerEmailsMock).not.toHaveBeenCalled();
+  });
+
+  it("fails the job for retry when a non-winner notification fails", async () => {
+    ticketsCollection.find.mockReturnValue(findResult([]));
+    nonWinnerNotifications.mockResolvedValue({ sent: 0, skipped: 0, failed: 1 });
+    const nonWinner = { registrantId: "507f1f77bcf86cd799439011", email: "other@example.com", date: "2026-05-28", orgName: "Org", emailFromAddress: "hello@ticketfarm.ca", emailFromName: "Org" };
+    await expect(runFunction([nonWinner])).rejects.toThrow("Failed to send 1 result emails.");
   });
 
   it("skips tickets already marked sent", async () => {
@@ -106,7 +128,7 @@ describe("sendWinnerEmailsFunction", () => {
     expect(ticketsCollection.bulkWrite).toHaveBeenCalledWith([
       {
         updateOne: {
-          filter: { orgId: "org_1", date: "2026-05-28", email: "lin@example.com" },
+          filter: { orgId: "org_1", date: "2026-05-28", ticketId: "TICKETLIN002", emailSent: { $ne: true } },
           update: {
             $set: {
               emailSent: true,
@@ -140,7 +162,7 @@ describe("sendWinnerEmailsFunction", () => {
     expect(ticketsCollection.bulkWrite).toHaveBeenCalledWith([
       {
         updateOne: {
-          filter: { orgId: "org_1", date: "2026-05-28", email: "ada@example.com" },
+          filter: { orgId: "org_1", date: "2026-05-28", ticketId: "TICKETADA001", emailSent: { $ne: true } },
           update: {
             $set: {
               emailSent: false,

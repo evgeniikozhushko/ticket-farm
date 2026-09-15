@@ -1,3 +1,41 @@
+# Private draw results and redemption
+
+## Approved implementation
+
+- [x] Inspect draw snapshot, references, email/outbox, authorization, pickup model, and public routes.
+- [x] Persist non-winner notification work in the draw transaction and extend delivery/retry tracking.
+- [x] Remove public results and update email/privacy wording; retain existing pickup fields.
+- [x] Add organization-scoped reference lookup and atomic check-in in the Lottery dashboard.
+- [x] Verify notifications, authorization, public access, and concurrent redemption; run project checks.
+- [x] Review final diff and record verification/limitations.
+
+## Results/redemption review — September 14, 2026
+
+### Changes
+
+- Removed `/{orgSlug}/winners` and its registration link. Legacy `/winners` remains an explicit 404.
+- Reused the cryptographically generated 12-character reference and existing unique-index definition. No additional credentials or registrant lookup flow.
+- Saved non-winner recipient IDs and email payloads in the draw outbox transaction alongside winner tickets. Existing `(orgId, date)` identifies the single daily draw. No invented eligibility statuses; only the transaction's actual entrant snapshot is notified.
+- Added non-winner notification acceptance/error tracking and extended the existing current-day retry action. Successful writes cannot be overwritten by concurrent failure writes; both templates use stable provider idempotency keys.
+- Added a staff reference panel with explicit confirmation. Atomic `ACTIVE` to `CHECKED_IN` update records `checkedInAt`; cross-organization references behave as invalid. Participant history exposes check-in time and non-winner email acceptance/error state.
+- Tightened member-role authorization and the winner query's organization scope. Updated registration, privacy, and pickup-proof copy.
+- Preserved existing pickup time/location. Existing date is explicitly labeled lottery date. No pickup-date setting or resend-management feature was added.
+
+### Verification
+
+- Full suite with disposable local MongoDB replica set: **24 files, 131 tests passed**, including real transaction rollback, snapshot/retry exclusion of late registrations, tenant isolation, and concurrent redemption (exactly one success and stable timestamp).
+- Reproduce database integration tests using `TICKET_FARM_TEST_MONGODB_URI='mongodb://127.0.0.1:<port>/?replicaSet=<name>' pnpm test`. Tests create and drop only a randomly named local test database. Without this variable, four integration tests are explicitly skipped.
+- `pnpm lint`, `pnpm exec tsc --noEmit --incremental false`, `pnpm build`, and `git diff --check` passed.
+- Production-server HTTP checks: `/example-org/winners` and `/winners` returned **404**; anonymous `/dashboard/lottery` returned **307** to authentication.
+- Inspected public routes/actions/API entry points and retained authenticated dashboard queries. Email markup and provider-call tests verify recipient, reference, instructions, and idempotency keys. No real notification emails were sent.
+
+### Limitations / remaining readiness work
+
+- Configured database read-only count/index check failed with DNS `ENOTFOUND`, including outside the sandbox. Existing production data and installed production indexes could not be verified. The user's pre-launch assumption remains explicit; no production data was modified.
+- Report issues #3 (registration/draw admission race), #8 (stuck dispatch leases), and remaining #9 concerns (provider pacing, large event payloads, recovery after provider idempotency expires) are not resolved by this focused change. Snapshot-based notifications exclude late entrants but do not repair admission fairness. Provider acceptance is not guaranteed inbox delivery.
+- No authenticated browser or live Inngest/Resend delivery walkthrough was performed. Deployment/provider checks remain necessary before launch.
+- No dependencies added. Existing untracked `AGENTS.md` and previous task history preserved. Final diff reviewed; no commits or deployment performed.
+
 # Production Beta Readiness — todo.md
 
 ## Summary

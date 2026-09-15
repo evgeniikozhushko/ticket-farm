@@ -66,7 +66,7 @@ export default function WinnerTicketEmail({
                       >
                         <Text style={identifierLabel}>Ticket number</Text>
                         <Text className="ticket-number" style={ticketNumberValue}>
-                          #{ticketNumber}
+                          Ticket #{ticketNumber}
                         </Text>
                       </Column>
 
@@ -74,9 +74,9 @@ export default function WinnerTicketEmail({
                         className="identifier-column"
                         style={identifierColumnRight}
                       >
-                        <Text style={identifierLabel}>Ticket reference</Text>
+                        <Text style={identifierLabel}>Private reference</Text>
                         <Text className="ticket-reference" style={referenceValue}>
-                          {ticketId}
+                          Reference: {ticketId}
                         </Text>
                       </Column>
                     </Row>
@@ -90,7 +90,7 @@ export default function WinnerTicketEmail({
                         className="detail-column"
                         style={detailColumnLeft}
                       >
-                        <Text style={detailLabel}>Date</Text>
+                        <Text style={detailLabel}>Lottery date</Text>
                         <Text className="detail-value" style={detailValue}>
                           {date}
                         </Text>
@@ -125,8 +125,10 @@ export default function WinnerTicketEmail({
             </Heading>
 
             <Text style={bodyText}>
-              Bring this email, ticket number, or ticket reference when you
-              collect your ticket. Please arrive during the pickup time shown
+              Bring this email and present your private Reference to staff to
+              validate and redeem your ticket. Your ticket number alone cannot
+              be used for pickup. Keep your Reference private; it can be redeemed
+              only once. Please arrive during the pickup time shown
               above. If you can no longer attend, contact {orgName} as soon as
               possible.
             </Text>

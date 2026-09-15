@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import WinnerTicketEmail from "@/emails/winner-ticket-email";
+import NonWinnerEmailTemplate from "@/emails/non-winner-email";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -24,6 +25,31 @@ export interface EmailResult {
   messageId?: string;
 }
 
+export interface NonWinnerEmail {
+  registrantId: string;
+  email: string;
+  date: string;
+  orgName: string;
+  emailFromAddress: string;
+  emailFromName: string;
+}
+
+export async function sendNonWinnerEmail(recipient: NonWinnerEmail): Promise<EmailResult> {
+  try {
+    const { data, error } = await resend.emails.send({
+      from: `${recipient.emailFromName} <${recipient.emailFromAddress}>`,
+      to: [recipient.email],
+      subject: `Your lottery result | ${recipient.orgName}`,
+      react: NonWinnerEmailTemplate(recipient),
+    }, { idempotencyKey: `non-winner:${recipient.registrantId}:${recipient.date}` });
+    return error
+      ? { success: false, email: recipient.email, error: error.message }
+      : { success: true, email: recipient.email, messageId: data?.id };
+  } catch (error) {
+    return { success: false, email: recipient.email, error: error instanceof Error ? error.message : "Email send failed." };
+  }
+}
+
 export async function sendWinnerEmail(ticket: EmailTicket): Promise<EmailResult> {
   try {
     const { data, error } = await resend.emails.send({
@@ -39,7 +65,7 @@ export async function sendWinnerEmail(ticket: EmailTicket): Promise<EmailResult>
         orgName: ticket.orgName,
         pickupLocation: ticket.pickupLocation,
       }),
-    });
+    }, { idempotencyKey: `winner:${ticket.ticketId}` });
 
     if (error) {
       console.error(`Failed to send email to ${ticket.email}:`, error);

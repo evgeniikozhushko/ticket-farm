@@ -267,6 +267,7 @@ export default async function ParticipantsPage({
                               </p>
                               <p className="text-xs text-muted-foreground">
                                 {entry.ticketStatus}
+                                {entry.checkedInAt && ` · Checked in ${new Date(entry.checkedInAt).toLocaleString()}`}
                               </p>
                             </div>
                           ) : (
@@ -288,7 +289,7 @@ export default async function ParticipantsPage({
                             </span>
                           ) : (
                             <span className="text-muted-foreground">
-                              Not applicable
+                              No result email recorded
                             </span>
                           )}
                         </div>
@@ -341,6 +342,7 @@ export default async function ParticipantsPage({
                                   </div>
                                   <div className="text-xs text-muted-foreground">
                                     {entry.ticketStatus}
+                                    {entry.checkedInAt && ` · Checked in ${new Date(entry.checkedInAt).toLocaleString()}`}
                                   </div>
                                 </div>
                               ) : (
@@ -362,7 +364,7 @@ export default async function ParticipantsPage({
                                 </span>
                               ) : (
                                 <span className="text-muted-foreground">
-                                  Not applicable
+                                  No result email recorded
                                 </span>
                               )}
                             </TableCell>
