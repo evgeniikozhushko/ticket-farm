@@ -28,7 +28,7 @@ vi.mock("@/lib/mongodb", () => ({
       callback(session),
   }),
 }));
-vi.mock("@/lib/org-cache", () => ({ getOrgBySlug: mocks.org }));
+vi.mock("@/lib/orgs", () => ({ getOrgBySlug: mocks.org }));
 vi.mock("@/lib/date", () => ({ getTodayDateString: () => "2026-05-28" }));
 vi.mock("next/headers", () => ({ headers: mocks.headers }));
 import { enterLottery } from "@/lib/actions/lottery.actions";
@@ -86,6 +86,16 @@ describe("public registration", () => {
     expect(mocks.headers).not.toHaveBeenCalled();
     expect(mocks.lotteries.updateOne).not.toHaveBeenCalled();
     expect(mocks.getLimits).not.toHaveBeenCalled();
+  });
+
+  it("refuses registration when the public organization lookup is disabled", async () => {
+    mocks.org.mockResolvedValue(null);
+
+    expect(await enter()).toEqual(
+      failed("This lottery page is not available."),
+    );
+    expect(mocks.registrants.findOne).not.toHaveBeenCalled();
+    expect(mocks.headers).not.toHaveBeenCalled();
   });
 
   it("consumes limits before initialization and inserts with the quota session", async () => {

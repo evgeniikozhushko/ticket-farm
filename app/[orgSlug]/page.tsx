@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { getOrgBySlug } from "@/lib/org-cache";
+import { getOrgBySlug } from "@/lib/orgs";
 import { RegistrationForm } from "@/components/registration-form";
 import { getTodayDateString } from "@/lib/date";
 import { DEFAULT_PICKUP_TIME } from "@/lib/pickup";

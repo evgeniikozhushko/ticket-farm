@@ -6,7 +6,9 @@ const organizationsCollection = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/mongodb", () => ({
-  getOrganizationsCollection: vi.fn(() => Promise.resolve(organizationsCollection)),
+  getOrganizationsCollection: vi.fn(() =>
+    Promise.resolve(organizationsCollection),
+  ),
 }));
 
 vi.mock("@/lib/plan-limits", () => ({
@@ -21,7 +23,9 @@ async function loadOrgs() {
 describe("org DB helpers", () => {
   beforeEach(() => {
     organizationsCollection.findOne.mockReset();
-    organizationsCollection.updateOne.mockReset().mockResolvedValue({ modifiedCount: 1 });
+    organizationsCollection.updateOne
+      .mockReset()
+      .mockResolvedValue({ modifiedCount: 1 });
   });
 
   it("gets an organization by Clerk org ID", async () => {
@@ -36,11 +40,45 @@ describe("org DB helpers", () => {
     });
   });
 
+  it("gets only enabled public organizations by slug", async () => {
+    const org = {
+      clerkOrgId: "org_1",
+      slug: "ticket-farm",
+      publicPageEnabled: true,
+    };
+    organizationsCollection.findOne.mockResolvedValue(org);
+    const { getOrgBySlug } = await loadOrgs();
+
+    await expect(getOrgBySlug("ticket-farm")).resolves.toBe(org);
+
+    expect(organizationsCollection.findOne).toHaveBeenCalledWith({
+      slug: "ticket-farm",
+      publicPageEnabled: true,
+    });
+  });
+
+  it("reads public organization state on every request", async () => {
+    organizationsCollection.findOne
+      .mockResolvedValueOnce({ slug: "ticket-farm", publicPageEnabled: true })
+      .mockResolvedValueOnce(null);
+    const { getOrgBySlug } = await loadOrgs();
+
+    await expect(getOrgBySlug("ticket-farm")).resolves.not.toBeNull();
+    await expect(getOrgBySlug("ticket-farm")).resolves.toBeNull();
+
+    expect(organizationsCollection.findOne).toHaveBeenCalledTimes(2);
+  });
+
   it("uses statusUpdatedAt guard so older out-of-order events are ignored by MongoDB", async () => {
     const { updateSubscriptionStatus } = await loadOrgs();
     const eventTimestamp = new Date("2026-05-28T12:00:00Z");
 
-    await updateSubscriptionStatus("cus_123", "active", "growth", eventTimestamp);
+    await updateSubscriptionStatus(
+      "cus_123",
+      "active",
+      "growth",
+      eventTimestamp,
+    );
 
     expect(organizationsCollection.updateOne).toHaveBeenCalledWith(
       {
@@ -57,7 +95,7 @@ describe("org DB helpers", () => {
           maxRegistrantsPerDay: 2000,
           statusUpdatedAt: eventTimestamp,
         }),
-      })
+      }),
     );
   });
 });

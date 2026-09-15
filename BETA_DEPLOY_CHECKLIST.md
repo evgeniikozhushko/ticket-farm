@@ -112,9 +112,14 @@ Run against the Vercel preview URL.
       org without loading every historical registrant into the browser.
 - [ ] Stripe webhook endpoint returns 200 on a test-mode event.
 - [ ] Atlas escalation dry-run: pick one beta test org, bump
-      `maxRegistrantsPerDay` from 100 to 250 directly in Atlas, wait up to 5
-      min for the org-slug cache TTL, verify public registration accepts the
-      101st entry that day, then reset the org.
+      `maxRegistrantsPerDay` from 100 to 250 directly in Atlas, verify the next
+      public registration observes the new limit, then reset the org. Already
+      admitted registrations remain valid; lowering a cap below today's count
+      stops further admission for that day.
+- [ ] Public-page authority smoke: disable a beta test org's public page, then
+      repeat page and admission requests across fresh requests/instances and
+      confirm they are refused immediately. Re-enable it and confirm the next
+      request succeeds.
 - [ ] Production logs show no unhandled errors during smoke path.
 
 ## 6. Atlas escalation (operator note)

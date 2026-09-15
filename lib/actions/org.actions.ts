@@ -3,7 +3,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { getOrganizationsCollection } from "@/lib/mongodb";
 import { requireRole } from "@/lib/authz";
-import { invalidateOrgCache } from "@/lib/org-cache";
 import { isDuplicateKeyError } from "@/lib/mongo-errors";
 import { getPlanLimit } from "@/lib/plan-limits";
 import { parseOrgSlug } from "@/lib/slugs";
@@ -57,12 +56,15 @@ const createOrganizationSchema = z
   .strict();
 
 export async function createOrganization(
-  input: unknown
+  input: unknown,
 ): Promise<{ success: true } | { success: false; error: string }> {
   const { userId, orgId } = await auth();
 
   if (!userId || !orgId) {
-    return { success: false, error: "You must be signed in to an organization first." };
+    return {
+      success: false,
+      error: "You must be signed in to an organization first.",
+    };
   }
 
   const parsed = createOrganizationSchema.safeParse(input);
@@ -102,7 +104,10 @@ export async function createOrganization(
         return { success: true };
       }
 
-      return { success: false, error: "This slug is already in use. Please choose another." };
+      return {
+        success: false,
+        error: "This slug is already in use. Please choose another.",
+      };
     }
 
     throw err;
@@ -114,7 +119,10 @@ export async function createOrganization(
     try {
       await getOrCreateStripeCustomer(orgId, parsed.data.name);
     } catch (err) {
-      console.error("[createOrganization] Stripe customer creation failed:", err);
+      console.error(
+        "[createOrganization] Stripe customer creation failed:",
+        err,
+      );
     }
   }
 
@@ -151,12 +159,13 @@ function getDuplicateKeyField(err: unknown): string | undefined {
     return undefined;
   }
 
-  const keyPattern = (err as { keyPattern?: Record<string, unknown> }).keyPattern;
+  const keyPattern = (err as { keyPattern?: Record<string, unknown> })
+    .keyPattern;
   return keyPattern ? Object.keys(keyPattern)[0] : undefined;
 }
 
 export async function updateOrganizationSettings(
-  settings: unknown
+  settings: unknown,
 ): Promise<{ success: boolean; error?: string }> {
   const { orgId } = await requireRole("org:admin");
 
@@ -168,7 +177,10 @@ export async function updateOrganizationSettings(
   }
 
   // Block mutating settings while subscription is in a degraded state
-  if (existing.subscriptionStatus === "past_due" || existing.subscriptionStatus === "canceled") {
+  if (
+    existing.subscriptionStatus === "past_due" ||
+    existing.subscriptionStatus === "canceled"
+  ) {
     return {
       success: false,
       error: `Settings changes are locked while your subscription is ${existing.subscriptionStatus}. Please resolve your billing first.`,
@@ -184,20 +196,17 @@ export async function updateOrganizationSettings(
   try {
     await collection.updateOne(
       { clerkOrgId: orgId },
-      { $set: { ...parsed.data, updatedAt: new Date() } }
+      { $set: { ...parsed.data, updatedAt: new Date() } },
     );
   } catch (err) {
     if (isDuplicateKeyError(err)) {
-      return { success: false, error: "This slug is already in use. Please choose another." };
+      return {
+        success: false,
+        error: "This slug is already in use. Please choose another.",
+      };
     }
 
     throw err;
-  }
-
-  // If slug changed, invalidate both old and new slug from cache.
-  if (parsed.data.slug && parsed.data.slug !== existing.slug) {
-    invalidateOrgCache(existing.slug);
-    invalidateOrgCache(parsed.data.slug);
   }
 
   return { success: true };

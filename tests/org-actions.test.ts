@@ -6,7 +6,6 @@ const organizationsCollection = vi.hoisted(() => ({
   updateOne: vi.fn(),
 }));
 const requireRoleMock = vi.hoisted(() => vi.fn());
-const invalidateOrgCacheMock = vi.hoisted(() => vi.fn());
 const authMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@clerk/nextjs/server", () => ({
@@ -14,7 +13,9 @@ vi.mock("@clerk/nextjs/server", () => ({
 }));
 
 vi.mock("@/lib/mongodb", () => ({
-  getOrganizationsCollection: vi.fn(() => Promise.resolve(organizationsCollection)),
+  getOrganizationsCollection: vi.fn(() =>
+    Promise.resolve(organizationsCollection),
+  ),
 }));
 
 vi.mock("@/lib/plan-limits", () => ({
@@ -23,10 +24,6 @@ vi.mock("@/lib/plan-limits", () => ({
 
 vi.mock("@/lib/authz", () => ({
   requireRole: requireRoleMock,
-}));
-
-vi.mock("@/lib/org-cache", () => ({
-  invalidateOrgCache: invalidateOrgCacheMock,
 }));
 
 vi.mock("@/lib/stripe", () => ({
@@ -55,11 +52,14 @@ async function loadActions() {
 describe("createOrganization", () => {
   beforeEach(() => {
     organizationsCollection.findOne.mockReset().mockResolvedValue(null);
-    organizationsCollection.insertOne.mockReset().mockResolvedValue({ acknowledged: true });
+    organizationsCollection.insertOne
+      .mockReset()
+      .mockResolvedValue({ acknowledged: true });
     organizationsCollection.updateOne.mockReset();
     requireRoleMock.mockReset();
-    invalidateOrgCacheMock.mockReset();
-    authMock.mockReset().mockResolvedValue({ userId: "user_1", orgId: "org_1" });
+    authMock
+      .mockReset()
+      .mockResolvedValue({ userId: "user_1", orgId: "org_1" });
     delete process.env.STRIPE_SECRET_KEY;
   });
 
@@ -72,7 +72,7 @@ describe("createOrganization", () => {
         name: "Canmore Food",
         slug: "canmore-food",
         timezone: "America/Edmonton",
-      })
+      }),
     ).resolves.toEqual({
       success: false,
       error: "You must be signed in to an organization first.",
@@ -88,14 +88,14 @@ describe("createOrganization", () => {
         name: "Canmore Food",
         slug: "  Canmore Food!! ",
         timezone: "America/Edmonton",
-      })
+      }),
     ).resolves.toEqual({ success: true });
 
     expect(organizationsCollection.insertOne).toHaveBeenCalledWith(
       expect.objectContaining({
         clerkOrgId: "org_1",
         slug: "canmore-food",
-      })
+      }),
     );
   });
 
@@ -109,7 +109,7 @@ describe("createOrganization", () => {
         name: "Canmore Food",
         slug: "canmore-food",
         timezone: "America/Edmonton",
-      })
+      }),
     ).resolves.toEqual({
       success: false,
       error: "Invalid organization details.",
@@ -128,14 +128,16 @@ describe("createOrganization", () => {
         name: "Canmore Food",
         slug: "canmore-food",
         timezone: "America/Edmonton",
-      })
+      }),
     ).resolves.toEqual({ success: true });
 
-    expect(organizationsCollection.findOne).toHaveBeenCalledWith({ clerkOrgId: "org_real" });
+    expect(organizationsCollection.findOne).toHaveBeenCalledWith({
+      clerkOrgId: "org_real",
+    });
     expect(organizationsCollection.insertOne).toHaveBeenCalledWith(
       expect.objectContaining({
         clerkOrgId: "org_real",
-      })
+      }),
     );
   });
 
@@ -148,7 +150,7 @@ describe("createOrganization", () => {
         name: "Canmore Food",
         slug: "canmore-food",
         timezone: "America/Edmonton",
-      })
+      }),
     ).resolves.toEqual({ success: true });
 
     expect(organizationsCollection.insertOne).not.toHaveBeenCalled();
@@ -162,7 +164,7 @@ describe("createOrganization", () => {
         name: "Dashboard Org",
         slug: "dashboard",
         timezone: "America/Edmonton",
-      })
+      }),
     ).resolves.toEqual({
       success: false,
       error: "Invalid organization details.",
@@ -178,7 +180,7 @@ describe("createOrganization", () => {
         name: "Canmore Food",
         slug: "canmore-food",
         timezone: "Mars/Basecamp",
-      })
+      }),
     ).resolves.toEqual({
       success: false,
       error: "Invalid organization details.",
@@ -187,7 +189,10 @@ describe("createOrganization", () => {
   });
 
   it("returns a friendly duplicate slug error", async () => {
-    organizationsCollection.insertOne.mockRejectedValue({ code: 11000, keyPattern: { slug: 1 } });
+    organizationsCollection.insertOne.mockRejectedValue({
+      code: 11000,
+      keyPattern: { slug: 1 },
+    });
     const { createOrganization } = await loadActions();
 
     await expect(
@@ -195,7 +200,7 @@ describe("createOrganization", () => {
         name: "Canmore Food",
         slug: "canmore-food",
         timezone: "America/Edmonton",
-      })
+      }),
     ).resolves.toEqual({
       success: false,
       error: "This slug is already in use. Please choose another.",
@@ -207,9 +212,10 @@ describe("updateOrganizationSettings", () => {
   beforeEach(() => {
     organizationsCollection.findOne.mockReset().mockResolvedValue(existingOrg);
     organizationsCollection.insertOne.mockReset();
-    organizationsCollection.updateOne.mockReset().mockResolvedValue({ modifiedCount: 1 });
+    organizationsCollection.updateOne
+      .mockReset()
+      .mockResolvedValue({ modifiedCount: 1 });
     requireRoleMock.mockReset().mockResolvedValue({ orgId: "org_1" });
-    invalidateOrgCacheMock.mockReset();
   });
 
   it("rejects unknown settings keys before writing", async () => {
@@ -220,7 +226,10 @@ describe("updateOrganizationSettings", () => {
       planName: "scale",
     });
 
-    expect(result).toEqual({ success: false, error: "Invalid organization settings." });
+    expect(result).toEqual({
+      success: false,
+      error: "Invalid organization settings.",
+    });
     expect(organizationsCollection.updateOne).not.toHaveBeenCalled();
   });
 
@@ -233,7 +242,10 @@ describe("updateOrganizationSettings", () => {
       stripeCustomerId: "cus_attacker",
     });
 
-    expect(result).toEqual({ success: false, error: "Invalid organization settings." });
+    expect(result).toEqual({
+      success: false,
+      error: "Invalid organization settings.",
+    });
     expect(organizationsCollection.updateOne).not.toHaveBeenCalled();
   });
 
@@ -250,7 +262,7 @@ describe("updateOrganizationSettings", () => {
         emailFromAddress: " HELLO@TICKETFARM.CA ",
         pickupTime: "  4:00-7:00 PM  ",
         pickupLocation: "  Canmore Community Centre  ",
-      })
+      }),
     ).resolves.toEqual({ success: true });
 
     expect(organizationsCollection.updateOne).toHaveBeenCalledWith(
@@ -267,10 +279,8 @@ describe("updateOrganizationSettings", () => {
           pickupLocation: "Canmore Community Centre",
           updatedAt: expect.any(Date),
         },
-      }
+      },
     );
-    expect(invalidateOrgCacheMock).toHaveBeenCalledWith("existing-org");
-    expect(invalidateOrgCacheMock).toHaveBeenCalledWith("new-farm");
   });
 
   it("rejects empty, too-short, too-long, and reserved slugs without writing", async () => {
@@ -284,31 +294,40 @@ describe("updateOrganizationSettings", () => {
       success: false,
       error: "Invalid organization settings.",
     });
-    await expect(updateOrganizationSettings({ slug: "a".repeat(64) })).resolves.toEqual({
+    await expect(
+      updateOrganizationSettings({ slug: "a".repeat(64) }),
+    ).resolves.toEqual({
       success: false,
       error: "Invalid organization settings.",
     });
-    await expect(updateOrganizationSettings({ slug: "platform" })).resolves.toEqual({
+    await expect(
+      updateOrganizationSettings({ slug: "platform" }),
+    ).resolves.toEqual({
       success: false,
       error: "Invalid organization settings.",
     });
 
     expect(organizationsCollection.updateOne).not.toHaveBeenCalled();
-    expect(invalidateOrgCacheMock).not.toHaveBeenCalled();
   });
 
   it("rejects invalid pickup details without writing", async () => {
     const { updateOrganizationSettings } = await loadActions();
 
-    await expect(updateOrganizationSettings({ pickupTime: "" })).resolves.toEqual({
+    await expect(
+      updateOrganizationSettings({ pickupTime: "" }),
+    ).resolves.toEqual({
       success: false,
       error: "Invalid organization settings.",
     });
-    await expect(updateOrganizationSettings({ pickupTime: "x".repeat(121) })).resolves.toEqual({
+    await expect(
+      updateOrganizationSettings({ pickupTime: "x".repeat(121) }),
+    ).resolves.toEqual({
       success: false,
       error: "Invalid organization settings.",
     });
-    await expect(updateOrganizationSettings({ pickupLocation: "x".repeat(241) })).resolves.toEqual({
+    await expect(
+      updateOrganizationSettings({ pickupLocation: "x".repeat(241) }),
+    ).resolves.toEqual({
       success: false,
       error: "Invalid organization settings.",
     });
@@ -319,7 +338,9 @@ describe("updateOrganizationSettings", () => {
   it("rejects invalid timezones without writing", async () => {
     const { updateOrganizationSettings } = await loadActions();
 
-    await expect(updateOrganizationSettings({ timezone: "Mars/Basecamp" })).resolves.toEqual({
+    await expect(
+      updateOrganizationSettings({ timezone: "Mars/Basecamp" }),
+    ).resolves.toEqual({
       success: false,
       error: "Invalid organization settings.",
     });
@@ -330,7 +351,9 @@ describe("updateOrganizationSettings", () => {
   it("accepts UTC as a timezone", async () => {
     const { updateOrganizationSettings } = await loadActions();
 
-    await expect(updateOrganizationSettings({ timezone: "UTC" })).resolves.toEqual({
+    await expect(
+      updateOrganizationSettings({ timezone: "UTC" }),
+    ).resolves.toEqual({
       success: true,
     });
 
@@ -341,14 +364,16 @@ describe("updateOrganizationSettings", () => {
           timezone: "UTC",
           updatedAt: expect.any(Date),
         },
-      }
+      },
     );
   });
 
   it("rejects non-boolean public page values without writing", async () => {
     const { updateOrganizationSettings } = await loadActions();
 
-    await expect(updateOrganizationSettings({ publicPageEnabled: "false" })).resolves.toEqual({
+    await expect(
+      updateOrganizationSettings({ publicPageEnabled: "false" }),
+    ).resolves.toEqual({
       success: false,
       error: "Invalid organization settings.",
     });
@@ -359,11 +384,15 @@ describe("updateOrganizationSettings", () => {
   it("rejects invalid or unverified sender addresses without writing", async () => {
     const { updateOrganizationSettings } = await loadActions();
 
-    await expect(updateOrganizationSettings({ emailFromAddress: "not-an-email" })).resolves.toEqual({
+    await expect(
+      updateOrganizationSettings({ emailFromAddress: "not-an-email" }),
+    ).resolves.toEqual({
       success: false,
       error: "Invalid organization settings.",
     });
-    await expect(updateOrganizationSettings({ emailFromAddress: "hello@example.com" })).resolves.toEqual({
+    await expect(
+      updateOrganizationSettings({ emailFromAddress: "hello@example.com" }),
+    ).resolves.toEqual({
       success: false,
       error: "Invalid organization settings.",
     });
@@ -375,7 +404,9 @@ describe("updateOrganizationSettings", () => {
     organizationsCollection.updateOne.mockRejectedValue({ code: 11000 });
     const { updateOrganizationSettings } = await loadActions();
 
-    await expect(updateOrganizationSettings({ slug: "taken-slug" })).resolves.toEqual({
+    await expect(
+      updateOrganizationSettings({ slug: "taken-slug" }),
+    ).resolves.toEqual({
       success: false,
       error: "This slug is already in use. Please choose another.",
     });

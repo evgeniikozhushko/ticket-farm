@@ -1,3 +1,75 @@
+# Authoritative public-page and quota state (finding #5)
+
+## Root cause
+
+`lib/org-cache.ts` caches the whole organization document per process for 5 minutes and
+is the only source for both public boundaries (`app/[orgSlug]/page.tsx`,
+`enterLottery`). `publicPageEnabled`, `timezone` and `maxRegistrantsPerDay` are therefore
+served stale. `updateOrganizationSettings` invalidates only on slug change, and only on the
+instance that handled the request; the Stripe path (`updateSubscriptionStatus`) invalidates
+nothing. Caching cannot be made authoritative here: a fresh read of these fields is the same
+single indexed `findOne` the cache was avoiding.
+
+## Plan
+
+- [x] Move `getOrgBySlug` into `lib/orgs.ts` as an uncached `findOne({ slug, publicPageEnabled: true })`; delete `lib/org-cache.ts`.
+- [x] Update the two callers (`app/[orgSlug]/page.tsx`, `lib/actions/lottery.actions.ts`) and drop `invalidateOrgCache` from `lib/actions/org.actions.ts`.
+- [x] Remove the "5 minutes to propagate" notice in `components/org-settings-form.tsx`.
+- [x] Document the effective-time rule in `BETA_DEPLOY_CHECKLIST.md` and `PROJECT_SUMMARY.md`: settings and quota changes apply to the next request on every instance; admitted registrations are never revoked; a cap below the day's count stops further admission that day.
+- [x] Tests: replace `tests/org-cache.test.ts` with `tests/orgs.test.ts` coverage (DB read per call, `publicPageEnabled` filter); repoint mocks in `tests/public-registration.test.ts`; make the registration integration suite seed/read the real organization collection; drop invalidation assertions in `tests/org-actions.test.ts`; add real-database regressions showing a disable refuses the next admission and a quota change affects the next attempt.
+- [x] Verify: targeted tests, full suite against the local replica set, `pnpm lint`, `tsc --noEmit`, `pnpm build` (confirm `/[orgSlug]` stays dynamic, not prerendered).
+- [x] Add a preview smoke step for the acceptance boundary: after disabling a page, repeat page and admission requests across fresh requests/instances and confirm immediate refusal; change the quota and confirm the next admission observes it without a TTL wait.
+- [x] Review the final diff and record verification and limits.
+
+## Scope notes
+
+- Leave `APP_SCALE_PLAN.md` and `SAAS_PLAN.md` unchanged because their cache references describe historical design intent; update the current operational sources `BETA_DEPLOY_CHECKLIST.md` and `PROJECT_SUMMARY.md`.
+- Removing the negative cache means unknown-slug traffic performs an indexed MongoDB lookup per request. Keep request-budget and bot mitigation changes in finding #6 rather than coupling them to authority correctness.
+- Define "next request" as a request whose authoritative organization lookup begins after the settings or quota write completes. An already in-flight request is not revoked; admitted registrations remain valid.
+
+## Review — authoritative public state
+
+### Changes
+
+- `getOrgBySlug` now lives in `lib/orgs.ts` and reads `{ slug, publicPageEnabled: true }` on
+  every call; `lib/org-cache.ts` and its test are deleted. Both public boundaries — the page
+  render and `enterLottery` — resolve the organization from MongoDB per request, so
+  `publicPageEnabled`, `timezone` and `maxRegistrantsPerDay` are authoritative on every
+  instance.
+- `updateOrganizationSettings` no longer invalidates a cache, and the settings form no longer
+  promises a 5-minute slug propagation delay.
+- `BETA_DEPLOY_CHECKLIST.md` and `PROJECT_SUMMARY.md` state the effective-time rule and replace
+  the TTL wait in the Atlas escalation dry-run; a disable/re-enable smoke step was added to the
+  preview walkthrough.
+- The registration integration suite seeds a real `organizations` document instead of mocking
+  the lookup, and drives capacity cases through that document. Added regressions: a disable
+  refuses the next admission, and a quota lowered then raised is observed on the next attempt.
+
+### Verification
+
+- `TICKET_FARM_TEST_MONGODB_URI='mongodb://127.0.0.1:27187/?replicaSet=ticketfarmtest' pnpm test`
+  — **24 files, 166 tests passed**, no skips; both integration suites ran.
+- `pnpm lint`, `pnpm exec tsc --noEmit --incremental false`, `pnpm build` — passed.
+- `pnpm build` route table shows `ƒ /[orgSlug]` (server-rendered on demand), so no
+  `force-dynamic` directive was needed and no full-route cache can serve a disabled page.
+- `git diff --check` clean; final diff reviewed.
+- The first suite run failed in `beforeAll` because the local disposable mongod was running
+  without an initiated replica set; initiated it on 127.0.0.1:27187 and re-ran. No application
+  database was used.
+
+### Limits
+
+- Multi-instance behavior is argued from the removal of all process-local state and verified
+  against a real database in-process; the preview disable/re-enable smoke across Vercel
+  instances remains an unchecked deployment step.
+- Unknown-slug traffic now performs an indexed lookup per request. A request budget belongs to
+  finding #6.
+- `APP_SCALE_PLAN.md` and `SAAS_PLAN.md` still describe the cache as historical design intent
+  and were intentionally left unchanged.
+- Editor formatting (Prettier) reflowed unrelated lines in `lib/actions/org.actions.ts`,
+  `lib/actions/lottery.actions.ts`, the touched tests, and the `PROJECT_SUMMARY.md` tables.
+  Those hunks are formatting only and were preserved, not reverted.
+
 # Transactional registration admission
 
 ## Approved plan
@@ -93,31 +165,35 @@ that need more than the free 100/day limit granted manually by a platform admin.
 ## Key changes
 
 ### 1. Fix release blockers
+
 - [x] Lint: ignored `scripts/ensure-next-dev-manifests.cjs` in `eslint.config.mjs`. `pnpm lint` now exits 0.
 - [x] Build hang: `pnpm clean && pnpm build` resolved it on first try. Build output shows Turbopack compile ~2s, TS check 2.5s, 13 static pages generated, exit 0. Still need to confirm green build on Vercel preview before promotion.
 - [x] Migrate `middleware.ts` → `proxy.ts` per Next 16. Done via `git mv` (history preserved). `clerkMiddleware` wrapper, route matchers, and onboarding redirect logic all preserved as-is — Clerk 6.37.3 still only exports `clerkMiddleware`, no `clerkProxy` needed. Build clean, tests green.
 
 ### 2. Configure production infrastructure
+
 - [ ] (Vercel/Atlas dashboard work) Create a fresh MongoDB Atlas production database. Run `pnpm setup-db` once against prod env vars to create indexes.
 - [ ] (Vercel dashboard work) Configure Vercel production env vars:
-    - MongoDB: `MONGODB_URI`, `MONGODB_DB_NAME`
-    - Clerk: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, sign-in/up/after-* URLs
-    - Resend: `RESEND_API_KEY`
-    - Stripe (test mode): `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
-    - **Intentionally leave unset:** `STRIPE_STARTER_PRICE_ID`, `STRIPE_GROWTH_PRICE_ID`, `STRIPE_SCALE_PRICE_ID` (see §3)
-    - Platform: `PLATFORM_ADMIN_USER_IDS`
-    - Inngest production: `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY` — provider-side wiring only; app code does not currently read these and does not need to.
+  - MongoDB: `MONGODB_URI`, `MONGODB_DB_NAME`
+  - Clerk: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, sign-in/up/after-\* URLs
+  - Resend: `RESEND_API_KEY`
+  - Stripe (test mode): `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
+  - **Intentionally leave unset:** `STRIPE_STARTER_PRICE_ID`, `STRIPE_GROWTH_PRICE_ID`, `STRIPE_SCALE_PRICE_ID` (see §3)
+  - Platform: `PLATFORM_ADMIN_USER_IDS`
+  - Inngest production: `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY` — provider-side wiring only; app code does not currently read these and does not need to.
 - [ ] (Vercel/Clerk dashboard work) Connect `ticketfarm.ca` to the Vercel project; add the domain to Clerk allowed redirect/origin URLs.
 - [x] Do NOT add Clerk webhooks or `CLERK_WEBHOOK_SECRET` for beta. Org creation stays owned by the in-app onboarding flow. Decision recorded; no code change needed.
 - [x] Audited `.env.example` vs every `process.env.*` reference in the codebase. Only gap was `SEED_ORG_ID`, which is read only by the one-shot `scripts/migrate-add-orgid.ts` migration; not relevant for a fresh prod DB, intentionally left out. Added a comment on the `STRIPE_*_PRICE_ID` block documenting the unset-in-beta decision.
 
 ### 3. Beta billing behavior (decision: option C — env-driven, zero code change)
+
 - [x] In Vercel production, leave `STRIPE_*_PRICE_ID` unset. Verified code path: `getPriceIdForPlan` (`lib/plan-limits.ts:32`) returns `undefined`, billing page falls through to the "Available after beta." fallback. (Dashboard step remains — must be set as unset in Vercel during §2.)
 - [x] Verified `BillingActionButton action="portal"` (`app/(dashboard)/billing/page.tsx:118`) is gated by `org.stripeCustomerId`. Beta orgs in test mode without a customer ID will not see it.
 - [x] Bonus: changed the no-priceId fallback copy from operator-style "Price ID not configured." to customer-facing "Available after beta." (`app/(dashboard)/billing/page.tsx:180`).
 - [x] Document the manual escalation path for beta orgs that need >100/day. Landed in `BETA_DEPLOY_CHECKLIST.md` §6 (lines 120–132). Operator note covers `clerkOrgId` lookup, `planName` / `maxRegistrantsPerDay` / `updatedAt` fields, and explicit "do not touch" guard on `subscriptionStatus` and `stripeCustomerId`.
 
 ### 4. Public trust pages (concrete checklist, no design pass)
+
 - [x] Home (`app/page.tsx`): added "· Private Beta" to the eyebrow line and a footer row with Privacy / Terms / hello@ticketfarm.ca links. Hero copy and primary CTA preserved.
 - [x] About (`app/about`): replaced the placeholder `<div>About</div>` with minimal beta-appropriate copy and a contact link.
 - [x] Added `app/privacy/page.tsx`: account data, lottery-registration data, email use, org isolation, subprocessor list, contact.
@@ -127,15 +203,18 @@ that need more than the free 100/day limit granted manually by a platform admin.
 ## Test plan
 
 ### Automated gates (must pass before deploy)
+
 - [x] `pnpm lint` — clean (one advisory: baseline-browser-mapping data >2 months old, non-blocking).
 - [x] `pnpm test` — 15 files, 72 tests, all pass (540ms).
 - [x] `pnpm build` — compile 2.0s, TS 2.5s, 15 routes generated, `Proxy (Middleware)` confirmed.
 
 ### Test updates
+
 - [x] Update `tests/middleware.test.ts` to import and exercise `proxy.ts` post-migration. Done — 4 `@/middleware` import paths swapped to `@/proxy`; existing mocks carried over unchanged. All 4 cases still pass.
 - [ ] No new automated test for checkout hiding — the mechanism is "env var unset", and a unit test for that is brittle. Cover it in the manual smoke instead.
 
 ### Manual smoke test on Vercel preview
+
 - [ ] Sign up a new user; create an org via onboarding; land on lottery dashboard.
 - [ ] Public registration at `https://<preview>/{orgSlug}` works; duplicate same-day entry shows the duplicate message.
 - [ ] Draw winners; Inngest enqueues `send-winner-emails`; Resend dispatches.
@@ -175,18 +254,18 @@ Code-side beta-readiness work is complete:
 
 All seven gates pass:
 
-| Gate | Evidence |
-| --- | --- |
-| `pnpm lint` | Clean. |
-| `pnpm exec tsc --noEmit` | No errors. |
-| `pnpm test` | 15 files / 72 tests pass. |
-| `pnpm build` | Compile 2.0s, TS 2.5s, 15 routes, `Proxy (Middleware)` confirmed. |
-| Font loading prod-safe | `app/layout.tsx` uses `next/font/google` (Geist + Geist_Mono), build-time self-hosted. |
-| Participant history uses DB aggregation + pagination | `lib/actions/participants.actions.ts:39` — `$match`/`$group`/`$lookup` pipeline, cursor by `email: { $gt: cursor }`, `$limit: limit + 1`. |
-| Checkout server-side plan-based | `app/api/billing/create-checkout/route.ts` — client sends `planName`, server `getPriceIdForPlan`, redirects use `getAppUrl()` (not request `Origin`), admin gate + plan allowlist. |
-| Org onboarding rejects mass-assignment | `lib/actions/org.actions.ts:50` — `createOrganizationSchema` accepts only `name`/`slug`/`timezone`; `orgSettingsSchema` (line 135) uses `.strict()`. `clerkOrgId`, `planName`, `subscriptionStatus`, `stripeCustomerId` are server-only. |
-| Sender restricted to `ticketfarm.ca` | `lib/actions/org.actions.ts:37` — `isTicketFarmSender` refines `emailFromAddress` on update; default is `hello@ticketfarm.ca`. |
-| Lottery draw uses crypto-grade randomness | `lib/actions/lottery-draw.actions.ts:3` — `randomInt` from `crypto`; Fisher-Yates shuffle; duplicate `ticketId` aborts via `DrawUserError`. |
+| Gate                                                 | Evidence                                                                                                                                                                                                                                 |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm lint`                                          | Clean.                                                                                                                                                                                                                                   |
+| `pnpm exec tsc --noEmit`                             | No errors.                                                                                                                                                                                                                               |
+| `pnpm test`                                          | 15 files / 72 tests pass.                                                                                                                                                                                                                |
+| `pnpm build`                                         | Compile 2.0s, TS 2.5s, 15 routes, `Proxy (Middleware)` confirmed.                                                                                                                                                                        |
+| Font loading prod-safe                               | `app/layout.tsx` uses `next/font/google` (Geist + Geist_Mono), build-time self-hosted.                                                                                                                                                   |
+| Participant history uses DB aggregation + pagination | `lib/actions/participants.actions.ts:39` — `$match`/`$group`/`$lookup` pipeline, cursor by `email: { $gt: cursor }`, `$limit: limit + 1`.                                                                                                |
+| Checkout server-side plan-based                      | `app/api/billing/create-checkout/route.ts` — client sends `planName`, server `getPriceIdForPlan`, redirects use `getAppUrl()` (not request `Origin`), admin gate + plan allowlist.                                                       |
+| Org onboarding rejects mass-assignment               | `lib/actions/org.actions.ts:50` — `createOrganizationSchema` accepts only `name`/`slug`/`timezone`; `orgSettingsSchema` (line 135) uses `.strict()`. `clerkOrgId`, `planName`, `subscriptionStatus`, `stripeCustomerId` are server-only. |
+| Sender restricted to `ticketfarm.ca`                 | `lib/actions/org.actions.ts:37` — `isTicketFarmSender` refines `emailFromAddress` on update; default is `hello@ticketfarm.ca`.                                                                                                           |
+| Lottery draw uses crypto-grade randomness            | `lib/actions/lottery-draw.actions.ts:3` — `randomInt` from `crypto`; Fisher-Yates shuffle; duplicate `ticketId` aborts via `DrawUserError`.                                                                                              |
 
 Remaining work is all dashboard-driven and must be performed in Vercel/Atlas/Clerk/Stripe consoles:
 

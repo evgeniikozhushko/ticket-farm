@@ -11,12 +11,10 @@ import {
 } from "@/lib/mongodb";
 import { getTodayDateString } from "@/lib/date";
 import { isDuplicateKeyError } from "@/lib/mongo-errors";
-import { getOrgBySlug } from "@/lib/org-cache";
+import { getOrgBySlug } from "@/lib/orgs";
 import type { Registrant } from "@/lib/types";
 
-type EnterLotteryResult =
-  | { success: true }
-  | { success: false; error: string };
+type EnterLotteryResult = { success: true } | { success: false; error: string };
 
 function isValidEmail(email: string): boolean {
   return /\S+@\S+\.\S+/.test(email);
@@ -38,7 +36,9 @@ function hashRateLimitValue(value: string): string {
 }
 
 function getRateLimitWindowStart(date: Date): number {
-  return Math.floor(date.getTime() / RATE_LIMIT_WINDOW_MS) * RATE_LIMIT_WINDOW_MS;
+  return (
+    Math.floor(date.getTime() / RATE_LIMIT_WINDOW_MS) * RATE_LIMIT_WINDOW_MS
+  );
 }
 
 function getRateLimitKey(input: {
@@ -58,13 +58,17 @@ function getRateLimitKey(input: {
 
 function getEffectiveRegistrationLimit(value: unknown): number | null {
   if (value === null || value === undefined) return null;
-  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) return null;
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0)
+    return null;
   return value;
 }
 
 async function getClientIp(): Promise<string> {
   const requestHeaders = await headers();
-  const forwardedFor = requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim();
+  const forwardedFor = requestHeaders
+    .get("x-forwarded-for")
+    ?.split(",")[0]
+    ?.trim();
   return (
     forwardedFor ||
     requestHeaders.get("x-real-ip") ||
@@ -98,7 +102,7 @@ async function consumeRegistrationRateLimit(input: {
           createdAt: now,
         },
       },
-      { upsert: true, returnDocument: "after" }
+      { upsert: true, returnDocument: "after" },
     );
 
     return { allowed: result !== null, consumed: result !== null, key };
@@ -109,7 +113,7 @@ async function consumeRegistrationRateLimit(input: {
         {
           $inc: { count: 1 },
           $set: { updatedAt: now },
-        }
+        },
       );
       return {
         allowed: retryResult.modifiedCount === 1,

@@ -3,17 +3,22 @@ import { getPlanLimit } from "@/lib/plan-limits";
 import type { Organization, PlanName, SubscriptionStatus } from "@/lib/types";
 
 export async function getOrganization(
-  clerkOrgId: string
+  clerkOrgId: string,
 ): Promise<Organization | null> {
   const collection = await getOrganizationsCollection();
   return collection.findOne({ clerkOrgId });
+}
+
+export async function getOrgBySlug(slug: string): Promise<Organization | null> {
+  const collection = await getOrganizationsCollection();
+  return collection.findOne({ slug, publicPageEnabled: true });
 }
 
 export async function updateSubscriptionStatus(
   stripeCustomerId: string,
   newStatus: SubscriptionStatus,
   newPlanName: PlanName,
-  eventTimestamp: Date
+  eventTimestamp: Date,
 ): Promise<void> {
   const collection = await getOrganizationsCollection();
 
@@ -33,6 +38,6 @@ export async function updateSubscriptionStatus(
         statusUpdatedAt: eventTimestamp,
         updatedAt: new Date(),
       },
-    }
+    },
   );
 }

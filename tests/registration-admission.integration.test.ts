@@ -9,25 +9,23 @@ import {
   it,
   vi,
 } from "vitest";
-import type { EmailDispatch, Lottery, Registrant, Ticket } from "@/lib/types";
+import type {
+  EmailDispatch,
+  Lottery,
+  Organization,
+  Registrant,
+  Ticket,
+} from "@/lib/types";
 
 // Opt-in and local only; never use the application's configured database.
 const uri = process.env.TICKET_FARM_TEST_MONGODB_URI;
 let client: MongoClient;
 let db: Db;
 const hooks = vi.hoisted(() => ({
-  cap: 100 as number | null,
   failInsert: false,
   beforeClaim: undefined as undefined | (() => Promise<void>),
   afterClaim: undefined as undefined | (() => Promise<void>),
   beforeDraw: undefined as undefined | (() => Promise<void>),
-}));
-vi.mock("@/lib/org-cache", () => ({
-  getOrgBySlug: async () => ({
-    clerkOrgId: "org_a",
-    maxRegistrantsPerDay: hooks.cap,
-    timezone: "America/Edmonton",
-  }),
 }));
 vi.mock("next/headers", () => ({
   headers: async () => new Headers({ "x-forwarded-for": "203.0.113.10" }),
@@ -36,14 +34,6 @@ vi.mock("@/lib/authz", () => ({
   requireRole: async () => ({ orgId: "org_a", userId: "staff" }),
   requireActiveSub: vi.fn(),
 }));
-vi.mock("@/lib/orgs", () => ({
-  getOrganization: async () => ({
-    name: "Org A",
-    timezone: "America/Edmonton",
-    emailFromAddress: "hello@ticketfarm.ca",
-    emailFromName: "Org A",
-  }),
-}));
 vi.mock("@/lib/date", () => ({ getTodayDateString: () => "2026-09-14" }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/email-dispatch-outbox", () => ({
@@ -51,6 +41,8 @@ vi.mock("@/lib/email-dispatch-outbox", () => ({
 }));
 vi.mock("@/lib/mongodb", () => ({
   getClient: async () => client,
+  getOrganizationsCollection: async () =>
+    db.collection<Organization>("organizations"),
   getPublicRegistrationRateLimitsCollection: async () =>
     db.collection("public_registration_rate_limits"),
   getTicketsCollection: async () => db.collection<Ticket>("tickets"),
@@ -145,13 +137,15 @@ describe.skipIf(!uri)(
       await db
         .collection("public_registration_rate_limits")
         .createIndex({ key: 1 }, { unique: true });
+      await db
+        .collection("organizations")
+        .createIndex({ slug: 1 }, { unique: true });
     });
     afterAll(async () => {
       if (db) await db.dropDatabase();
       if (client) await client.close();
     });
     beforeEach(async () => {
-      hooks.cap = 100;
       hooks.failInsert = false;
       hooks.beforeClaim = undefined;
       hooks.afterClaim = undefined;
@@ -162,8 +156,24 @@ describe.skipIf(!uri)(
         "tickets",
         "email_dispatches",
         "public_registration_rate_limits",
+        "organizations",
       ])
         await db.collection(name).deleteMany({});
+      const now = new Date();
+      await db.collection<Organization>("organizations").insertOne({
+        clerkOrgId: "org_a",
+        name: "Org A",
+        slug: "farm",
+        timezone: "America/Edmonton",
+        publicPageEnabled: true,
+        emailFromName: "Org A",
+        emailFromAddress: "hello@ticketfarm.ca",
+        subscriptionStatus: "active",
+        planName: "free",
+        maxRegistrantsPerDay: 100,
+        createdAt: now,
+        updatedAt: now,
+      });
     });
 
     it("includes admission committed before a competing draw in its recipient snapshot", async () => {
@@ -244,6 +254,50 @@ describe.skipIf(!uri)(
       ).toBe(0);
     });
 
+    it("refuses the next admission after the public page is disabled", async () => {
+      expect(await enter("before-disable@example.com")).toEqual({
+        success: true,
+      });
+      await db
+        .collection("organizations")
+        .updateOne(
+          { clerkOrgId: "org_a" },
+          { $set: { publicPageEnabled: false } },
+        );
+
+      expect(await enter("after-disable@example.com")).toEqual({
+        success: false,
+        error: "This lottery page is not available.",
+      });
+      await assertCount(1);
+    });
+
+    it("uses a changed quota on the next admission attempt", async () => {
+      await db
+        .collection("organizations")
+        .updateOne(
+          { clerkOrgId: "org_a" },
+          { $set: { maxRegistrantsPerDay: 1 } },
+        );
+      expect(await enter("first@example.com")).toEqual({ success: true });
+      expect(await enter("blocked@example.com")).toEqual({
+        success: false,
+        error: "Registration is full for today. Check back tomorrow.",
+      });
+
+      await db
+        .collection("organizations")
+        .updateOne(
+          { clerkOrgId: "org_a" },
+          { $set: { maxRegistrantsPerDay: 2 } },
+        );
+
+      expect(await enter("after-upgrade@example.com")).toEqual({
+        success: true,
+      });
+      await assertCount(2);
+    });
+
     it("concurrent duplicate requests create one registration and consume one slot", async () => {
       const results = await Promise.all(
         Array.from({ length: 4 }, () => enter("same@example.com")),
@@ -261,7 +315,12 @@ describe.skipIf(!uri)(
     });
 
     it("admits exactly N under concurrent demand without exceeding rate limits", async () => {
-      hooks.cap = 5;
+      await db
+        .collection("organizations")
+        .updateOne(
+          { clerkOrgId: "org_a" },
+          { $set: { maxRegistrantsPerDay: 5 } },
+        );
       const results = await Promise.all(
         Array.from({ length: 12 }, (_, i) => enter(`capacity${i}@example.com`)),
       );
@@ -296,7 +355,12 @@ describe.skipIf(!uri)(
     );
 
     it("zero capacity admits nobody", async () => {
-      hooks.cap = 0;
+      await db
+        .collection("organizations")
+        .updateOne(
+          { clerkOrgId: "org_a" },
+          { $set: { maxRegistrantsPerDay: 0 } },
+        );
       expect(await enter("zero@example.com")).toEqual({
         success: false,
         error: "Registration is full for today. Check back tomorrow.",
@@ -305,7 +369,12 @@ describe.skipIf(!uri)(
     });
 
     it("unlimited capacity admits all eligible requests", async () => {
-      hooks.cap = null;
+      await db
+        .collection("organizations")
+        .updateOne(
+          { clerkOrgId: "org_a" },
+          { $set: { maxRegistrantsPerDay: null } },
+        );
       const results = await Promise.all(
         Array.from({ length: 8 }, (_, i) => enter(`unlimited${i}@example.com`)),
       );
@@ -314,7 +383,12 @@ describe.skipIf(!uri)(
     });
 
     it("initializes a missing counter from only the existing organization/day entries", async () => {
-      hooks.cap = 3;
+      await db
+        .collection("organizations")
+        .updateOne(
+          { clerkOrgId: "org_a" },
+          { $set: { maxRegistrantsPerDay: 3 } },
+        );
       await db.collection("lotteries").insertOne({ ...scope, status: "OPEN" });
       await db.collection("registrants").insertMany([
         { ...scope, email: "old1@example.com" },

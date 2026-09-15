@@ -82,8 +82,6 @@ export function OrgSettingsForm({ org }: { org: OrgSettingsFormOrg }) {
     }
   };
 
-  const slugChanged = slug !== org.slug;
-
   return (
     <form onSubmit={handleSubmit} className="max-w-lg space-y-6">
       {/* Organization name */}
@@ -112,12 +110,6 @@ export function OrgSettingsForm({ org }: { org: OrgSettingsFormOrg }) {
           Registration page:{" "}
           <strong>ticketfarm.ca/{slug || "your-slug"}</strong>
         </p>
-        {slugChanged && (
-          <p className="text-xs text-amber-600">
-            Slug changes take up to 5 minutes to fully propagate across all
-            servers.
-          </p>
-        )}
       </div>
 
       {/* Timezone */}

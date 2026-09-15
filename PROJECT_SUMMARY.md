@@ -8,21 +8,21 @@ A multi-tenant SaaS lottery/ticket platform built on Next.js. Organizations run 
 
 ## Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Framework | Next.js 16 (App Router, React 19, React Compiler) |
-| Language | TypeScript 5 (strict mode) |
-| Auth | Clerk (`@clerk/nextjs`) — users + organizations + roles |
-| Database | MongoDB Atlas — shared DB, `orgId`-scoped collections |
-| Payments | Stripe — subscriptions, webhooks, customer portal |
-| Background jobs | Inngest — durable email queue |
-| Email | Resend + React Email templates |
-| UI | Shadcn/ui (new-york), Radix UI, Tailwind CSS v4 |
-| Table | TanStack Table v8 |
-| Charts | Recharts |
-| Validation | Zod v4 |
-| Package manager | pnpm |
-| Deployment | Vercel |
+| Layer           | Technology                                              |
+| --------------- | ------------------------------------------------------- |
+| Framework       | Next.js 16 (App Router, React 19, React Compiler)       |
+| Language        | TypeScript 5 (strict mode)                              |
+| Auth            | Clerk (`@clerk/nextjs`) — users + organizations + roles |
+| Database        | MongoDB Atlas — shared DB, `orgId`-scoped collections   |
+| Payments        | Stripe — subscriptions, webhooks, customer portal       |
+| Background jobs | Inngest — durable email queue                           |
+| Email           | Resend + React Email templates                          |
+| UI              | Shadcn/ui (new-york), Radix UI, Tailwind CSS v4         |
+| Table           | TanStack Table v8                                       |
+| Charts          | Recharts                                                |
+| Validation      | Zod v4                                                  |
+| Package manager | pnpm                                                    |
+| Deployment      | Vercel                                                  |
 
 ---
 
@@ -37,13 +37,13 @@ A multi-tenant SaaS lottery/ticket platform built on Next.js. Organizations run 
 
 ### Collections
 
-| Collection | Key Fields | Notable Indexes |
-|------------|-----------|-----------------|
-| `registrants` | orgId, name, email, date (YYYY-MM-DD), enteredAt | `{ orgId, email, date }` unique |
-| `lotteries` | orgId, date, status, registrantCount, maxTicketsAvailable | `{ orgId, date }` unique |
-| `tickets` | orgId, ticketId (6-digit unique), ticketNumber, status | `{ ticketId }` unique |
-| `organizations` | clerkOrgId, slug, subscriptionStatus, planName, maxRegistrantsPerDay | `{ clerkOrgId }` unique, `{ slug }` unique |
-| `processed_webhook_events` | stripeEventId | `{ stripeEventId }` unique |
+| Collection                 | Key Fields                                                           | Notable Indexes                            |
+| -------------------------- | -------------------------------------------------------------------- | ------------------------------------------ |
+| `registrants`              | orgId, name, email, date (YYYY-MM-DD), enteredAt                     | `{ orgId, email, date }` unique            |
+| `lotteries`                | orgId, date, status, registrantCount, maxTicketsAvailable            | `{ orgId, date }` unique                   |
+| `tickets`                  | orgId, ticketId (6-digit unique), ticketNumber, status               | `{ ticketId }` unique                      |
+| `organizations`            | clerkOrgId, slug, subscriptionStatus, planName, maxRegistrantsPerDay | `{ clerkOrgId }` unique, `{ slug }` unique |
+| `processed_webhook_events` | stripeEventId                                                        | `{ stripeEventId }` unique                 |
 
 ### Key Invariants
 
@@ -55,16 +55,17 @@ A multi-tenant SaaS lottery/ticket platform built on Next.js. Organizations run 
 
 ### Subscription Plans
 
-| Plan | Price | Daily registrant limit |
-|------|-------|----------------------|
-| free | $0 | 100 |
-| starter | $29/mo | 500 |
-| growth | $79/mo | 2,000 |
-| scale | $199/mo | Unlimited |
+| Plan    | Price   | Daily registrant limit |
+| ------- | ------- | ---------------------- |
+| free    | $0      | 100                    |
+| starter | $29/mo  | 500                    |
+| growth  | $79/mo  | 2,000                  |
+| scale   | $199/mo | Unlimited              |
 
 **Subscription states**: `trialing` → `active` → `past_due` → `canceled`
 
 **Entitlement guards**:
+
 - `trialing` / `active`: Full access
 - `past_due`: Read-only dashboard; billing portal accessible; public registration still open
 - `canceled`: Read-only; free-tier limits apply; public registration still open
@@ -103,7 +104,7 @@ ticket-farm/
 │   ├── date.ts                         # getTodayDateString(timezone)
 │   ├── email.ts                        # sendWinnerEmail(), sendBulkWinnerEmails()
 │   ├── mongodb.ts                      # Singleton client + typed collection helpers
-│   ├── org-cache.ts                    # LRU slug→orgId cache (500 entries, 5min TTL)
+│   ├── orgs.ts                         # Org reads by clerkOrgId/slug, subscription writes
 │   ├── plan-limits.ts                  # Plan constants, getPlanFromPriceId()
 │   ├── setup-indexes.ts                # Index creation (called at server startup)
 │   ├── stripe.ts                       # Stripe singleton, getOrCreateStripeCustomer()
@@ -188,7 +189,11 @@ INNGEST_SIGNING_KEY        # (implicit via Inngest SDK)
 
 ## Known Rough Edges / Possible Improvements
 
-1. **org-cache is per-instance**: Slug changes (rare) take up to 5 min to propagate across all Vercel instances. Acceptable trade-off; could use Redis for instant invalidation if needed.
+1. **Public organization reads are authoritative**: Public pages and admission
+   read the organization document on every request. Settings and quota changes
+   apply to the next request on every instance. Already admitted registrations
+   remain valid; lowering a cap below today's count stops further admission for
+   that day.
 
 2. **No rate limiting on public registration**: The registration endpoint has quota enforcement but no IP-based rate limiting. A bad actor could spam different emails to exhaust the quota.
 
