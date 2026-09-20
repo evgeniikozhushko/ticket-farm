@@ -38,6 +38,7 @@ import type { WinnerInfo, LotteryStatus } from "@/lib/types";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface LotteryDrawPanelProps {
+  isAdmin: boolean;
   initialStatus: LotteryStatus;
   initialWinners: WinnerInfo[];
   totalRegistrants: number;
@@ -46,6 +47,7 @@ interface LotteryDrawPanelProps {
 }
 
 export function LotteryDrawPanel({
+  isAdmin,
   initialStatus,
   initialWinners,
   totalRegistrants,
@@ -204,7 +206,9 @@ export function LotteryDrawPanel({
             <CardTitle>Lottery Draw</CardTitle>
             <CardDescription className="break-words">
               {status === "OPEN"
-                ? "Select number of winners and run the draw"
+                ? isAdmin
+                  ? "Select number of winners and run the draw"
+                  : "Lottery has not been drawn yet"
                 : `Lottery drawn on ${lastDrawnAt ? formatDate(lastDrawnAt) : "today"}`}
             </CardDescription>
           </div>
@@ -225,10 +229,12 @@ export function LotteryDrawPanel({
             {totalRegistrants === 0 ? (
               <div className="rounded-lg border border-dashed p-8 text-center">
                 <p className="text-muted-foreground">
-                  No registrants for today. Cannot run lottery draw.
+                  {isAdmin
+                    ? "No registrants for today. Cannot run lottery draw."
+                    : "No registrants for today."}
                 </p>
               </div>
-            ) : (
+            ) : isAdmin ? (
               <>
                 <div className="space-y-2">
                   <Label htmlFor="winnerCount">Number of Winners</Label>
@@ -266,6 +272,10 @@ export function LotteryDrawPanel({
                   )}
                 </Button>
               </>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {totalRegistrants} registrants so far today.
+              </p>
             )}
           </div>
         ) : (
@@ -358,7 +368,7 @@ export function LotteryDrawPanel({
               );
             })()}
 
-            {winners.length > 0 && (
+            {isAdmin && winners.length > 0 && (
               <Button
                 type="button"
                 variant="outline"

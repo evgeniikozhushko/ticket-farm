@@ -32,6 +32,19 @@ export default async function OnboardingPage() {
     );
   }
 
+  if (result.status === "needs-admin") {
+    return (
+      <main className="flex min-h-svh items-center justify-center bg-background px-4 py-8">
+        <div className="w-full max-w-md space-y-2 text-center">
+          <h1 className="text-2xl font-bold">Organization setup pending</h1>
+          <p className="text-muted-foreground">
+            An organization admin must complete setup before you can access the dashboard.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="flex min-h-svh flex-col items-center justify-start bg-background px-4 py-8 sm:justify-center sm:py-12">
       <div className="w-full max-w-md space-y-8">

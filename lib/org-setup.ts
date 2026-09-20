@@ -47,6 +47,7 @@ export async function requireOrganizationDocument(): Promise<{
 export type EnsureOrganizationResult =
   | { status: "ok" }
   | { status: "needs-clerk-org" }
+  | { status: "needs-admin" }
   | { status: "needs-form"; defaultSlug: string; error: string };
 
 function logOnboardingEvent(
@@ -72,7 +73,7 @@ function isClerkNotFoundError(err: unknown): boolean {
 }
 
 export async function ensureOrganizationDocument(): Promise<EnsureOrganizationResult> {
-  const { userId, orgId } = await auth();
+  const { userId, orgId, orgRole } = await auth();
 
   if (!userId) {
     logOnboardingEvent("info", "redirecting unauthenticated user to sign-in");
@@ -87,6 +88,10 @@ export async function ensureOrganizationDocument(): Promise<EnsureOrganizationRe
   if (await hasOrganizationDocument(orgId)) {
     logOnboardingEvent("info", "organization document already exists", { orgId });
     return { status: "ok" };
+  }
+
+  if (orgRole !== "org:admin") {
+    return { status: "needs-admin" };
   }
 
   let clerkOrg;

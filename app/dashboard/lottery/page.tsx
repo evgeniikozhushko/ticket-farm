@@ -15,7 +15,7 @@ import type { SerializedLotteryStats, SerializedRegistrant } from "@/lib/types";
 export const dynamic = 'force-dynamic';
 
 export default async function LotteryAdminPage() {
-  const { userId, orgId } = await auth();
+  const { userId, orgId, orgRole } = await auth();
 
   if (!userId) redirect("/sign-in");
   if (!orgId) redirect("/onboarding");
@@ -47,7 +47,7 @@ export default async function LotteryAdminPage() {
   const serializedWinners = winners;
 
   return (
-    <DashboardShell title="Lottery Admin">
+    <DashboardShell title="Lottery">
       <div className="flex flex-1 flex-col">
         <div className="@container/main flex flex-1 flex-col gap-2">
           <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
@@ -56,6 +56,7 @@ export default async function LotteryAdminPage() {
 
             {/* Lottery Draw Panel */}
             <LotteryDrawPanel
+              isAdmin={orgRole === "org:admin"}
               initialStatus={serializedStats.status}
               initialWinners={serializedWinners}
               totalRegistrants={serializedStats.totalRegistrants}

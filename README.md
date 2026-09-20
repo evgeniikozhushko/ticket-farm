@@ -61,8 +61,8 @@
 
 ## 🔐 Authorization
 
-- `org:admin` — Run draws, edit settings, access billing
-- `org:member` — View registrants and stats
+- `org:admin` — Complete initial setup, run draws, retry result emails, edit settings, access billing, and check in tickets
+- `org:member` — View lottery stats, registrants, winners, and private References; look up and check in tickets
 - Public — Registration form and winners page
 
 Roles are hierarchical (admin satisfies member checks).

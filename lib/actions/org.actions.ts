@@ -58,13 +58,17 @@ const createOrganizationSchema = z
 export async function createOrganization(
   input: unknown,
 ): Promise<{ success: true } | { success: false; error: string }> {
-  const { userId, orgId } = await auth();
+  const { userId, orgId, orgRole } = await auth();
 
   if (!userId || !orgId) {
     return {
       success: false,
       error: "You must be signed in to an organization first.",
     };
+  }
+
+  if (orgRole !== "org:admin") {
+    return { success: false, error: "Only an organization admin can complete setup." };
   }
 
   const parsed = createOrganizationSchema.safeParse(input);

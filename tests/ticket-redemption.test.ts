@@ -51,6 +51,7 @@ describe("staff reference redemption", () => {
       { returnDocument: "after" },
     );
     expect(collection.findOne).not.toHaveBeenCalled();
+    expect(auth).toHaveBeenCalledWith("org:member");
   });
   it.each([ ["CHECKED_IN", "already_redeemed"], ["CANCELED", "inactive"] ])("explains %s without another write", async (status, outcome) => {
     collection.findOneAndUpdate.mockResolvedValue(null);

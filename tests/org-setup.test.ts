@@ -102,7 +102,7 @@ describe("ensureOrganizationDocument", () => {
   });
 
   it("returns ok when Mongo already has the org, without fetching Clerk or creating", async () => {
-    authMock.mockResolvedValue({ userId: "user_1", orgId: "org_1" });
+    authMock.mockResolvedValue({ userId: "user_1", orgId: "org_1", orgRole: "org:member" });
     organizationsCollection.findOne.mockResolvedValue({ _id: "mongo_1" });
     const { ensureOrganizationDocument } = await import("@/lib/org-setup");
 
@@ -111,8 +111,18 @@ describe("ensureOrganizationDocument", () => {
     expect(createOrganizationMock).not.toHaveBeenCalled();
   });
 
+  it("waits for an admin when a member's organization is not set up", async () => {
+    authMock.mockResolvedValue({ userId: "user_1", orgId: "org_1", orgRole: "org:member" });
+    organizationsCollection.findOne.mockResolvedValue(null);
+    const { ensureOrganizationDocument } = await import("@/lib/org-setup");
+
+    await expect(ensureOrganizationDocument()).resolves.toEqual({ status: "needs-admin" });
+    expect(clerkClientMock).not.toHaveBeenCalled();
+    expect(createOrganizationMock).not.toHaveBeenCalled();
+  });
+
   it("auto-provisions the Mongo org from Clerk metadata when missing", async () => {
-    authMock.mockResolvedValue({ userId: "user_1", orgId: "org_1" });
+    authMock.mockResolvedValue({ userId: "user_1", orgId: "org_1", orgRole: "org:admin" });
     organizationsCollection.findOne.mockResolvedValue(null);
     getClerkOrganizationMock.mockResolvedValue({ name: "Canmore Food Barn", slug: "canmore-food-barn" });
     createOrganizationMock.mockResolvedValue({ success: true });
@@ -128,7 +138,7 @@ describe("ensureOrganizationDocument", () => {
   });
 
   it("falls back to normalized name when Clerk slug is empty", async () => {
-    authMock.mockResolvedValue({ userId: "user_1", orgId: "org_1" });
+    authMock.mockResolvedValue({ userId: "user_1", orgId: "org_1", orgRole: "org:admin" });
     organizationsCollection.findOne.mockResolvedValue(null);
     getClerkOrganizationMock.mockResolvedValue({ name: "Canmore Food Barn", slug: "" });
     createOrganizationMock.mockResolvedValue({ success: true });
@@ -143,7 +153,7 @@ describe("ensureOrganizationDocument", () => {
   });
 
   it("returns needs-form with defaultSlug and error when createOrganization fails", async () => {
-    authMock.mockResolvedValue({ userId: "user_1", orgId: "org_1" });
+    authMock.mockResolvedValue({ userId: "user_1", orgId: "org_1", orgRole: "org:admin" });
     organizationsCollection.findOne.mockResolvedValue(null);
     getClerkOrganizationMock.mockResolvedValue({ name: "Dashboard", slug: "dashboard" });
     createOrganizationMock.mockResolvedValue({ success: false, error: "This slug is reserved. Please choose another." });
@@ -157,7 +167,7 @@ describe("ensureOrganizationDocument", () => {
   });
 
   it("returns needs-clerk-org when Clerk reports the org was not found", async () => {
-    authMock.mockResolvedValue({ userId: "user_1", orgId: "org_stale" });
+    authMock.mockResolvedValue({ userId: "user_1", orgId: "org_stale", orgRole: "org:admin" });
     organizationsCollection.findOne.mockResolvedValue(null);
     getClerkOrganizationMock.mockRejectedValue({
       status: 404,
@@ -173,7 +183,7 @@ describe("ensureOrganizationDocument", () => {
   });
 
   it("propagates other Clerk fetch errors", async () => {
-    authMock.mockResolvedValue({ userId: "user_1", orgId: "org_1" });
+    authMock.mockResolvedValue({ userId: "user_1", orgId: "org_1", orgRole: "org:admin" });
     organizationsCollection.findOne.mockResolvedValue(null);
     getClerkOrganizationMock.mockRejectedValue(new Error("Clerk API outage"));
     const { ensureOrganizationDocument } = await import("@/lib/org-setup");

@@ -322,3 +322,34 @@ Remaining work is all dashboard-driven and must be performed in Vercel/Atlas/Cle
 2. Set Vercel prod env vars (block in `BETA_DEPLOY_CHECKLIST.md` §2).
 3. Wire `ticketfarm.ca` in Vercel + Clerk allowed URLs.
 4. Deploy to preview, run manual smoke (§5), promote.
+
+# Close finding #7 and align dashboard permissions
+
+## Approved plan
+
+- [x] Inspect organization setup, dashboard controls, action guards, tests, and role documentation.
+- [x] Require an organization admin before initial settings are parsed or stored.
+- [x] Show unprovisioned members an admin setup message while preserving admin auto-setup and provisioned member access.
+- [x] Keep member lottery information, References, and ticket check-in visible; hide draw, email-retry, settings, and billing controls.
+- [x] Update focused permission tests and role documentation.
+- [x] Run targeted tests, full suite, lint, type check, build, and diff check; review the final diff.
+
+## Review
+
+### Changes
+
+- Required `org:admin` before initial organization validation or database access, while preserving the action result shape.
+- Added a member waiting state during setup and kept admin auto-provisioning and provisioned member access.
+- Kept lottery data, winner References, and ticket pickup available to members; limited draw, email retry, settings, and billing controls to admins.
+- Updated role documentation and focused permission tests. No dependencies added.
+
+### Verification
+
+- Targeted permission tests passed.
+- Local replica-set suite: 28 files, 202 tests passed.
+- `pnpm lint`, `pnpm exec tsc --noEmit --incremental false`, `pnpm build`, and `git diff --check` passed.
+
+### Notes
+
+- The first full-suite attempt timed out because the disposable local MongoDB replica set was stopped. It passed after restarting that local server.
+- Real-key Turnstile preview smoke and winner-email recovery findings #8 and #9 remain follow-on work.

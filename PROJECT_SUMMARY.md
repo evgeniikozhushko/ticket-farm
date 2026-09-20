@@ -132,8 +132,8 @@ ticket-farm/
 ## Authorization
 
 ```
-requireRole('org:admin')  — drawTodayLottery, org settings, billing
-requireRole('org:member') — view registrants, view stats
+org:admin  — initial setup, draws, result email retries, org settings, billing
+org:member — view stats, registrants, winners and private References; ticket lookup and check-in
 Public                    — registration form, winners page
 ```
 

@@ -83,6 +83,24 @@ describe("drawTodayLottery", () => {
     dispatchesCollection.findOne.mockReset().mockResolvedValue(null);
   });
 
+  it("rejects member draw and email-retry calls before database work", async () => {
+    requireRoleMock.mockRejectedValue(new Error("Forbidden: admin role required"));
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const { drawTodayLottery, retryTodayWinnerEmails } = await loadAction();
+
+      await expect(drawTodayLottery(1)).resolves.toMatchObject({ success: false });
+      await expect(retryTodayWinnerEmails()).resolves.toMatchObject({ success: false });
+      expect(requireRoleMock).toHaveBeenNthCalledWith(1, "org:admin");
+      expect(requireRoleMock).toHaveBeenNthCalledWith(2, "org:admin");
+      expect(getOrganizationMock).not.toHaveBeenCalled();
+      expect(lotteriesCollection.updateOne).not.toHaveBeenCalled();
+      expect(ticketsCollection.find).not.toHaveBeenCalled();
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
   it("returns already drawn when the draw lock cannot be acquired", async () => {
     lotteriesCollection.updateOne.mockResolvedValue({ matchedCount: 0 });
     const { drawTodayLottery } = await loadAction();

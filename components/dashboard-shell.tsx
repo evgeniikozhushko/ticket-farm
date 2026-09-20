@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
+import { auth } from "@clerk/nextjs/server";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
@@ -13,10 +14,12 @@ type DashboardShellProps = {
   children: ReactNode;
 };
 
-export function DashboardShell({ title, children }: DashboardShellProps) {
+export async function DashboardShell({ title, children }: DashboardShellProps) {
+  const { orgRole } = await auth();
+
   return (
     <SidebarProvider style={dashboardShellStyle}>
-      <AppSidebar variant="inset" />
+      <AppSidebar variant="inset" isAdmin={orgRole === "org:admin"} />
       <SidebarInset>
         <SiteHeader title={title} />
         {children}

@@ -59,7 +59,7 @@ describe("createOrganization", () => {
     requireRoleMock.mockReset();
     authMock
       .mockReset()
-      .mockResolvedValue({ userId: "user_1", orgId: "org_1" });
+      .mockResolvedValue({ userId: "user_1", orgId: "org_1", orgRole: "org:admin" });
     delete process.env.STRIPE_SECRET_KEY;
   });
 
@@ -77,6 +77,22 @@ describe("createOrganization", () => {
       success: false,
       error: "You must be signed in to an organization first.",
     });
+    expect(organizationsCollection.insertOne).not.toHaveBeenCalled();
+  });
+
+  it("rejects member setup before parsing or reading initial settings", async () => {
+    authMock.mockResolvedValue({ userId: "user_1", orgId: "org_1", orgRole: "org:member" });
+    const { createOrganization } = await loadActions();
+
+    await expect(createOrganization({
+      name: "Canmore Food",
+      slug: "canmore-food",
+      timezone: "America/Edmonton",
+    })).resolves.toEqual({
+      success: false,
+      error: "Only an organization admin can complete setup.",
+    });
+    expect(organizationsCollection.findOne).not.toHaveBeenCalled();
     expect(organizationsCollection.insertOne).not.toHaveBeenCalled();
   });
 
@@ -100,7 +116,7 @@ describe("createOrganization", () => {
   });
 
   it("rejects client-supplied org identity", async () => {
-    authMock.mockResolvedValue({ userId: "user_1", orgId: "org_real" });
+    authMock.mockResolvedValue({ userId: "user_1", orgId: "org_real", orgRole: "org:admin" });
     const { createOrganization } = await loadActions();
 
     await expect(
@@ -120,7 +136,7 @@ describe("createOrganization", () => {
   });
 
   it("uses auth orgId for valid organization creation", async () => {
-    authMock.mockResolvedValue({ userId: "user_1", orgId: "org_real" });
+    authMock.mockResolvedValue({ userId: "user_1", orgId: "org_real", orgRole: "org:admin" });
     const { createOrganization } = await loadActions();
 
     await expect(
