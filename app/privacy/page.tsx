@@ -15,7 +15,7 @@ export default function PrivacyPage() {
           Privacy notice
         </h1>
         <p className="text-sm text-muted-foreground">
-          Last updated: May 2026. Ticket Farm is in private beta; this notice may change
+          Last updated: September 2026. Ticket Farm is in private beta; this notice may change
           as the product matures.
         </p>
 
@@ -37,7 +37,10 @@ export default function PrivacyPage() {
           <p className="text-muted-foreground">
             <strong className="text-foreground">Operational data.</strong> Standard
             request logs (IP, user agent, timestamps) are retained for security and
-            debugging.
+            debugging. We use hashed IP addresses and hashed email/organization combinations
+            to count public registration attempts for one-hour windows. Public registration
+            also sends a security challenge token and your IP address to Cloudflare for
+            Turnstile verification.
           </p>
         </section>
 
@@ -67,7 +70,8 @@ export default function PrivacyPage() {
           <p className="text-muted-foreground">
             We rely on third parties for hosting (Vercel), database (MongoDB Atlas),
             authentication (Clerk), email delivery (Resend), background jobs (Inngest),
-            and billing (Stripe — currently in test mode during beta). Each handles data
+            billing (Stripe — currently in test mode during beta), and registration
+            security checks (Cloudflare). Each handles data
             under their own terms.
           </p>
         </section>

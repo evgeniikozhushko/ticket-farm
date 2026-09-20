@@ -64,6 +64,11 @@ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
 
 INNGEST_EVENT_KEY=<inngest prod event key>
 INNGEST_SIGNING_KEY=<inngest prod signing key>
+
+NEXT_PUBLIC_TURNSTILE_SITE_KEY=<production Turnstile site key>
+TURNSTILE_SECRET_KEY=<matching production Turnstile secret key>
+TURNSTILE_ALLOWED_HOSTNAMES=ticketfarm.ca
+# Optional for supervised shared-network events: PUBLIC_REGISTRATION_IP_ATTEMPT_LIMIT=500
 ```
 
 **Intentionally leave unset:**
@@ -91,6 +96,9 @@ creation stays owned by the in-app onboarding flow.
 
 - [ ] Push `production-beta` (already done if you're reading this on GitHub).
 - [ ] Confirm Vercel builds the preview cleanly.
+- [ ] Set paired Turnstile site and secret keys for preview. Include its exact hostname
+      in `TURNSTILE_ALLOWED_HOSTNAMES` and the Cloudflare widget's hostname settings.
+      Rebuild preview when changing `NEXT_PUBLIC_TURNSTILE_SITE_KEY`.
 - [ ] Run the manual smoke (§5) against the preview URL.
 - [ ] Check Vercel function logs during smoke; there should be no unhandled
       errors from MongoDB, Clerk, Stripe, Resend, or Inngest.
@@ -102,8 +110,18 @@ Run against the Vercel preview URL.
 
 - [ ] Sign up a new user; create an org via onboarding; land on lottery
       dashboard.
-- [ ] Public registration at `<preview>/{orgSlug}` works; duplicate same-day
-      entry shows the duplicate message.
+- [ ] Public registration at `<preview>/{orgSlug}` works with Turnstile; duplicate
+      same-day entry shows ordinary success and consumes no additional lottery slot.
+- [ ] With paired Cloudflare test sitekeys/secrets, check widget readiness and
+      rejection behavior. The passing test secret returns a dummy hostname and no
+      action, so the application's strict response checks reject it. Test credentials
+      are documented at https://developers.cloudflare.com/turnstile/troubleshooting/testing/.
+      Passing visible pair: sitekey `1x00000000000000000000AA`, secret
+      `1x0000000000000000000000000000000AA`. Failing visible pair: sitekey
+      `2x00000000000000000000AB`, secret `2x0000000000000000000000000000000AA`.
+      Restore real preview keys, then verify successful registration and rejection
+      on the configured exact preview hostname. Never mix a test sitekey with a
+      production secret.
 - [ ] Draw winners; Inngest enqueues `send-winner-emails`; Resend dispatches.
 - [ ] `/winners`, org settings, `/billing` (no checkout buttons visible, free
       tier shows "Available after beta." on paid cards), and `/platform`

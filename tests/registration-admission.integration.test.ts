@@ -28,7 +28,11 @@ const hooks = vi.hoisted(() => ({
   beforeDraw: undefined as undefined | (() => Promise<void>),
 }));
 vi.mock("next/headers", () => ({
-  headers: async () => new Headers({ "x-forwarded-for": "203.0.113.10" }),
+  headers: async () => new Headers({ "x-vercel-forwarded-for": "203.0.113.10" }),
+}));
+vi.mock("@/lib/turnstile", () => ({
+  verifyRegistrationChallenge: async (token: string, ip: string) =>
+    token === "verified-test-token" && ip === "203.0.113.10",
 }));
 vi.mock("@/lib/authz", () => ({
   requireRole: async () => ({ orgId: "org_a", userId: "staff" }),
@@ -88,6 +92,7 @@ function enter(email: string) {
   form.set("name", "Person");
   form.set("email", email);
   form.set("consent", "true");
+  form.set("cf-turnstile-response", "verified-test-token");
   return enterLottery("farm", form);
 }
 function gate() {
@@ -241,7 +246,7 @@ describe.skipIf(!uri)(
       await assertSnapshot(["seed@example.com", ...successful]);
     });
 
-    it("rolls back the quota write on insert failure and refunds rate limits", async () => {
+    it("rolls back the quota write on insert failure and retains attempt charges", async () => {
       hooks.failInsert = true;
       expect(await enter("failed@example.com")).toMatchObject({
         success: false,
@@ -251,7 +256,7 @@ describe.skipIf(!uri)(
         await db
           .collection("public_registration_rate_limits")
           .countDocuments({ count: { $ne: 0 } }),
-      ).toBe(0);
+      ).toBe(2);
     });
 
     it("refuses the next admission after the public page is disabled", async () => {
@@ -302,7 +307,7 @@ describe.skipIf(!uri)(
       const results = await Promise.all(
         Array.from({ length: 4 }, () => enter("same@example.com")),
       );
-      expect(results.filter((r) => r.success)).toHaveLength(1);
+      expect(results.filter((r) => r.success)).toHaveLength(4);
       await assertCount(1);
       expect(
         (
@@ -311,7 +316,7 @@ describe.skipIf(!uri)(
             .find()
             .toArray()
         ).map((r) => r.count),
-      ).toEqual([1, 1]);
+      ).toEqual([4, 4]);
     });
 
     it("admits exactly N under concurrent demand without exceeding rate limits", async () => {

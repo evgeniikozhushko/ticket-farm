@@ -48,7 +48,7 @@ A multi-tenant SaaS lottery/ticket platform built on Next.js. Organizations run 
 ### Key Invariants
 
 1. **Atomic quota**: `Lottery.registrantCount` incremented with `findOneAndUpdate` + `$inc + $lt` guard. Rolled back on registrant insert failure.
-2. **Duplicate registration prevention**: Unique index `{ orgId, email, date }` on registrants. E11000 caught and returned as user-friendly error (with jittered retry for race conditions).
+2. **Duplicate registration prevention**: Unique index `{ orgId, email, date }` on registrants. Verified duplicate submissions return the ordinary success result without another quota claim; duplicate-key races require a confirming registrant read.
 3. **Atomic draw lock**: `updateOne({ status: { $ne: "LOTTERY_DRAWN" } })` prevents double-draws.
 4. **Idempotent Stripe webhooks**: Events stored in `processed_webhook_events`. Out-of-order protection via `{ statusUpdatedAt: { $lt: event.created } }` conditional filter.
 5. **Async email**: Draw emits `lottery/draw.completed` Inngest event. Emails sent outside HTTP lifecycle (no Vercel timeout risk). Tracks `emailSent`, `emailSentAt`, `emailError` per ticket.
@@ -195,7 +195,7 @@ INNGEST_SIGNING_KEY        # (implicit via Inngest SDK)
    remain valid; lowering a cap below today's count stops further admission for
    that day.
 
-2. **No rate limiting on public registration**: The registration endpoint has quota enforcement but no IP-based rate limiting. A bad actor could spam different emails to exhaust the quota.
+2. **Public registration abuse controls**: Global hashed-IP and email-plus-organization attempt budgets, plus Cloudflare Turnstile verification, protect registration. These controls do not establish ownership of an email address. Shared networks can reach the IP budget, and pre-challenge email attempts can temporarily block a targeted address.
 
 3. **Ticket check-in not implemented**: `tickets.status = "CHECKED_IN"` field exists on the model but there's no UI or API to trigger it.
 

@@ -1,3 +1,52 @@
+# Harden public registration abuse controls (finding #6)
+
+## Approved plan
+
+- [x] Replace loose registration parsing with bounded Zod validation: trimmed name (1–120), normalized valid email (maximum 254), consent, and a Turnstile token no longer than 2,048 characters; mirror field limits in the form.
+- [x] Replace refundable success counters with non-refundable attempt budgets applied before organization lookup, duplicate lookup, Turnstile verification, and admission: a global hashed-IP one-hour budget (default 500, configurable with `PUBLIC_REGISTRATION_IP_ATTEMPT_LIMIT`) and a hashed email-plus-org-slug budget of 10/hour.
+- [x] Prefer Vercel's `x-vercel-forwarded-for` client-IP header and use `x-forwarded-for` only when absent; validate the selected value as one IP, fail closed on malformed values, and allow missing headers only in development.
+- [x] Add a dependency-free Cloudflare Turnstile managed widget and server-side Siteverify helper. Verify the client IP, action `public_registration`, and an exact hostname allowlist; retry one transient failure with the same UUID idempotency key and a three-second timeout per attempt.
+- [x] Fail closed when Turnstile is unavailable or misconfigured; reject missing, invalid, expired, replayed, wrong-action, and wrong-host tokens; reset the single-use widget after every unsuccessful submission.
+- [x] Require `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`, and comma-separated `TURNSTILE_ALLOWED_HOSTNAMES`; document the optional IP-budget override and preview hostname setup.
+- [x] Move duplicate detection behind the budgets and challenge, return the ordinary success result without inserting or consuming quota, and keep `enterLottery`'s existing result type.
+- [x] Update the privacy notice and operational documentation for Cloudflare, Turnstile configuration/test keys, shared-network override policy, and preview smoke scenarios; remove stale claims that registration has no rate limiting.
+- [x] Add unit coverage for validation, trusted-IP handling, durable attempt budgets, Turnstile response/retry cases, uniform duplicate success, and ordering before expensive work.
+- [x] Update the real MongoDB admission suite to use verified challenges and confirm quota, draw concurrency, duplicate, rollback, and rate-limit invariants remain intact.
+- [x] Run the full local replica-set suite, lint, type checking, production build, and `git diff --check`; review the final diff and record changes, verification, and limitations below.
+
+## Decisions and assumptions
+
+- Cloudflare Turnstile Managed mode plus attempt budgets is the private-beta anti-abuse strategy. It raises the cost of distributed abuse but does not prove ownership of the supplied email; email confirmation remains a future escalation if beta abuse warrants it.
+- Duplicate submissions receive the same success UI as new registrations but create no record and consume no lottery quota.
+- Challenge/provider/configuration failures fail closed.
+- The shared-network IP budget defaults to 500 attempts/hour and can be raised deliberately for a supervised event through configuration.
+- The pre-challenge email-plus-slug budget can temporarily lock out a targeted email. Accept this tradeoff for the supervised pilot.
+- Turnstile hostnames are checked against an explicit server-side allowlist for preview and production.
+- Ticket Farm is assumed to run directly behind standard Vercel ingress without a custom trusted proxy.
+- Cloudflare's passing test secret currently returns a dummy hostname and no action, so strict Siteverify checks reject it. Use test keys to check rejection and real preview keys for successful end-to-end registration.
+- Vercel documents `x-vercel-forwarded-for` as its stable copy of `x-forwarded-for`, with incoming `x-forwarded-for` overwritten on standard ingress. Verified Proxy Lite is available on Hobby/Pro for supported providers, while custom trusted proxy support differs; any proxy change requires a new IP-policy review. See https://vercel.com/docs/headers/request-headers and https://vercel.com/docs/security/reverse-proxy.
+- Finding #7 and later production-readiness findings are out of scope for this task.
+
+## Review
+
+### Changes
+
+- Added global IP and email-plus-canonical-slug attempt budgets, bounded input validation, trusted Vercel IP handling, and server-side Turnstile verification. Removed rate-limit refunds.
+- Added the Managed widget and uniform duplicate success while preserving transactional admission and quota behavior.
+- Updated environment, privacy, project, and beta deployment documentation; no dependencies added.
+
+### Verification
+
+- `TICKET_FARM_TEST_MONGODB_URI='mongodb://127.0.0.1:27187/?replicaSet=ticketfarmtest' pnpm test` — 25 files, 189 tests passed, including real local MongoDB admission tests.
+- `pnpm lint`, `pnpm exec tsc --noEmit --incremental false`, `pnpm build`, and `git diff --check` — passed. The public organization route remains dynamic.
+- Live Cloudflare passing test secret returned a dummy hostname and no action; the failing test secret returned `success: false`. These provider probes confirm why the application requires real preview keys for successful end-to-end smoke.
+
+### Limits
+
+- Preview smoke with real Turnstile keys and configured preview hostname remains a deployment step; no preview credentials or deployment were available in this workspace.
+- The pre-challenge email budget can temporarily block a targeted email, and shared networks can reach the global IP budget. Neither control proves email ownership.
+- The disposable replica set was bound to localhost and used random test databases. No production database, dependencies, commits, or deployment were changed.
+
 # Authoritative public-page and quota state (finding #5)
 
 ## Root cause

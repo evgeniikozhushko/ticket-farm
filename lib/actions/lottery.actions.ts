@@ -3,6 +3,8 @@
 import { MongoError, ObjectId } from "mongodb";
 import { headers } from "next/headers";
 import { createHash, randomInt } from "crypto";
+import { isIP } from "node:net";
+import { z } from "zod";
 import {
   getClient,
   getLotteriesCollection,
@@ -12,24 +14,22 @@ import {
 import { getTodayDateString } from "@/lib/date";
 import { isDuplicateKeyError } from "@/lib/mongo-errors";
 import { getOrgBySlug } from "@/lib/orgs";
+import { parseOrgSlug } from "@/lib/slugs";
+import { verifyRegistrationChallenge } from "@/lib/turnstile";
 import type { Registrant } from "@/lib/types";
 
 type EnterLotteryResult = { success: true } | { success: false; error: string };
 
-function isValidEmail(email: string): boolean {
-  return /\S+@\S+\.\S+/.test(email);
-}
-
 const MAX_QUOTA_RETRIES = 5;
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
-const PUBLIC_IP_REGISTRATION_LIMIT = 20;
-const PUBLIC_EMAIL_REGISTRATION_LIMIT = 5;
-
-type RateLimitConsumption = {
-  allowed: boolean;
-  consumed: boolean;
-  key: string;
-};
+const PUBLIC_IP_REGISTRATION_LIMIT = 500;
+const PUBLIC_EMAIL_REGISTRATION_LIMIT = 10;
+const registrationSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  email: z.string().trim().toLowerCase().max(254).email(),
+  consent: z.literal("true"),
+  token: z.string().min(1).max(2048),
+});
 
 function hashRateLimitValue(value: string): string {
   return createHash("sha256").update(value).digest("hex");
@@ -42,18 +42,25 @@ function getRateLimitWindowStart(date: Date): number {
 }
 
 function getRateLimitKey(input: {
-  orgId: string;
-  scope: "ip" | "email";
+  scope: "ip" | "email-slug";
   value: string;
   windowStart: number;
 }): string {
   return [
     "public-registration",
-    input.orgId,
     input.scope,
     hashRateLimitValue(input.value),
     input.windowStart,
   ].join(":");
+}
+
+function getIpAttemptLimit(): number {
+  const override = process.env.PUBLIC_REGISTRATION_IP_ATTEMPT_LIMIT;
+  if (!override || !/^[1-9]\d*$/.test(override)) return PUBLIC_IP_REGISTRATION_LIMIT;
+  const parsed = Number(override);
+  return Number.isSafeInteger(parsed) && parsed <= 100000
+    ? parsed
+    : PUBLIC_IP_REGISTRATION_LIMIT;
 }
 
 function getEffectiveRegistrationLimit(value: unknown): number | null {
@@ -65,24 +72,19 @@ function getEffectiveRegistrationLimit(value: unknown): number | null {
 
 async function getClientIp(): Promise<string> {
   const requestHeaders = await headers();
-  const forwardedFor = requestHeaders
-    .get("x-forwarded-for")
-    ?.split(",")[0]
-    ?.trim();
-  return (
-    forwardedFor ||
-    requestHeaders.get("x-real-ip") ||
-    requestHeaders.get("cf-connecting-ip") ||
-    "unknown"
-  );
+  const header = requestHeaders.get("x-vercel-forwarded-for")
+    ?? requestHeaders.get("x-forwarded-for");
+  if (header === null && process.env.NODE_ENV === "development") return "127.0.0.1";
+  const ip = header?.trim() ?? "";
+  if (!isIP(ip)) throw new Error("Invalid registration client IP");
+  return ip;
 }
 
 async function consumeRegistrationRateLimit(input: {
-  orgId: string;
-  scope: "ip" | "email";
+  scope: "ip" | "email-slug";
   value: string;
   limit: number;
-}): Promise<RateLimitConsumption> {
+}): Promise<boolean> {
   const now = new Date();
   const windowStart = getRateLimitWindowStart(now);
   const expiresAt = new Date(windowStart + RATE_LIMIT_WINDOW_MS);
@@ -105,7 +107,7 @@ async function consumeRegistrationRateLimit(input: {
       { upsert: true, returnDocument: "after" },
     );
 
-    return { allowed: result !== null, consumed: result !== null, key };
+    return result !== null;
   } catch (err) {
     if (isDuplicateKeyError(err)) {
       const retryResult = await collection.updateOne(
@@ -115,43 +117,9 @@ async function consumeRegistrationRateLimit(input: {
           $set: { updatedAt: now },
         },
       );
-      return {
-        allowed: retryResult.modifiedCount === 1,
-        consumed: retryResult.modifiedCount === 1,
-        key,
-      };
+      return retryResult.modifiedCount === 1;
     }
     throw err;
-  }
-}
-
-async function rollbackRegistrationRateLimits(
-  consumptions: RateLimitConsumption[],
-): Promise<void> {
-  const consumedKeys = consumptions
-    .filter((consumption) => consumption.consumed)
-    .map((consumption) => consumption.key);
-
-  if (consumedKeys.length === 0) {
-    return;
-  }
-
-  try {
-    const collection = await getPublicRegistrationRateLimitsCollection();
-    await Promise.all(
-      consumedKeys.map(async (key) => {
-        try {
-          await collection.updateOne(
-            { key, count: { $gt: 0 } },
-            { $inc: { count: -1 }, $set: { updatedAt: new Date() } },
-          );
-        } catch (err) {
-          console.error("[rate-limit] rollback failed:", err);
-        }
-      }),
-    );
-  } catch (err) {
-    console.error("[rate-limit] rollback failed:", err);
   }
 }
 
@@ -161,34 +129,43 @@ const CLOSED_MESSAGE = "Registration is closed for today. Check back tomorrow.";
 const FULL_MESSAGE = "Registration is full for today. Check back tomorrow.";
 const UNAVAILABLE_MESSAGE =
   "Registration is currently unavailable. Please try again later.";
-const DUPLICATE_MESSAGE =
-  "You've already entered today's lottery. Please check back tomorrow.";
-
 export async function enterLottery(
   orgSlug: string,
   formData: FormData,
 ): Promise<EnterLotteryResult> {
-  const rateLimitConsumptions: RateLimitConsumption[] = [];
-  let refundRateLimits = true;
   try {
-    const name = String(formData.get("name") ?? "").trim();
-    const email = String(formData.get("email") ?? "")
-      .trim()
-      .toLowerCase();
-    const consent = formData.get("consent") === "true";
+    const ip = await getClientIp();
+    if (!await consumeRegistrationRateLimit({
+      scope: "ip", value: ip, limit: getIpAttemptLimit(),
+    })) return { success: false, error: "Too many registration attempts. Please try again later." };
 
-    if (!name || !email) {
-      return { success: false, error: "Name and email are required." };
+    const parsed = registrationSchema.safeParse({
+      name: formData.get("name"),
+      email: formData.get("email"),
+      consent: formData.get("consent"),
+      token: formData.get("cf-turnstile-response"),
+    });
+    if (!parsed.success || typeof orgSlug !== "string" || orgSlug.length > 128) {
+      return { success: false, error: "Please check your registration details and try again." };
     }
-    if (!isValidEmail(email)) {
-      return { success: false, error: "Please enter a valid email address." };
+    let canonicalSlug: string;
+    try {
+      canonicalSlug = parseOrgSlug(orgSlug);
+    } catch {
+      return { success: false, error: "This lottery page is not available." };
     }
-    if (!consent) {
-      return { success: false, error: "You must agree to the lottery terms." };
+    const { name, email, token } = parsed.data;
+    if (!await consumeRegistrationRateLimit({
+      scope: "email-slug",
+      value: JSON.stringify([email, canonicalSlug]),
+      limit: PUBLIC_EMAIL_REGISTRATION_LIMIT,
+    })) return { success: false, error: "Too many registration attempts. Please try again later." };
+    if (!await verifyRegistrationChallenge(token, ip)) {
+      return { success: false, error: "Security check failed. Please try again." };
     }
 
     // Resolve org from slug (public route — no Clerk JWT)
-    const org = await getOrgBySlug(orgSlug);
+    const org = await getOrgBySlug(canonicalSlug);
     if (!org) {
       return { success: false, error: "This lottery page is not available." };
     }
@@ -198,7 +175,6 @@ export async function enterLottery(
       org.maxRegistrantsPerDay,
     );
     const date = getTodayDateString(org.timezone);
-    const lotteriesCollection = await getLotteriesCollection();
     const registrantsCollection = await getRegistrantsCollection();
 
     const existingRegistrant = await registrantsCollection.findOne({
@@ -206,42 +182,8 @@ export async function enterLottery(
       email,
       date,
     });
-    if (existingRegistrant) {
-      return {
-        success: false,
-        error: DUPLICATE_MESSAGE,
-      };
-    }
-
-    const ip = await getClientIp();
-    const limiterResults = await Promise.allSettled([
-      consumeRegistrationRateLimit({
-        orgId,
-        scope: "ip",
-        value: ip,
-        limit: PUBLIC_IP_REGISTRATION_LIMIT,
-      }),
-      consumeRegistrationRateLimit({
-        orgId,
-        scope: "email",
-        value: email,
-        limit: PUBLIC_EMAIL_REGISTRATION_LIMIT,
-      }),
-    ]);
-    for (const result of limiterResults) {
-      if (result.status === "fulfilled")
-        rateLimitConsumptions.push(result.value);
-    }
-    const limiterFailure = limiterResults.find(
-      (result) => result.status === "rejected",
-    );
-    if (limiterFailure?.status === "rejected") throw limiterFailure.reason;
-    if (rateLimitConsumptions.some((consumption) => !consumption.allowed)) {
-      return {
-        success: false,
-        error: "Too many registration attempts. Please try again later.",
-      };
-    }
+    if (existingRegistrant) return { success: true };
+    const lotteriesCollection = await getLotteriesCollection();
 
     // Initialization cannot reopen or reset an existing lottery. The unique
     // (orgId, date) index arbitrates concurrent first registrations.
@@ -372,7 +314,6 @@ export async function enterLottery(
         err.hasErrorLabel("UnknownTransactionCommitResult")
       ) {
         // Absence after an uncertain commit does not prove that it aborted.
-        refundRateLimits = false;
         try {
           const committed = await registrantsCollection.findOne(
             { _id: newRegistrant._id, orgId, date },
@@ -392,12 +333,22 @@ export async function enterLottery(
       }
       // Classify only after withTransaction has aborted; transient errors must
       // reach the driver unchanged so it can retry the whole transaction.
-      if (isDuplicateKeyError(err))
-        return { success: false, error: DUPLICATE_MESSAGE };
+      if (isDuplicateKeyError(err)) {
+        try {
+          const confirmed = await registrantsCollection.findOne(
+            { orgId, email, date },
+            { readPreference: "primary", readConcern: { level: "majority" } },
+          );
+          return confirmed
+            ? { success: true }
+            : { success: false, error: UNAVAILABLE_MESSAGE };
+        } catch {
+          return { success: false, error: UNAVAILABLE_MESSAGE };
+        }
+      }
       throw err;
     }
 
-    refundRateLimits = false;
     return { success: true };
   } catch (err) {
     if (err instanceof AdmissionError)
@@ -407,8 +358,5 @@ export async function enterLottery(
       success: false,
       error: "Something went wrong on our side. Please try again.",
     };
-  } finally {
-    if (refundRateLimits)
-      await rollbackRegistrationRateLimits(rateLimitConsumptions);
   }
 }
