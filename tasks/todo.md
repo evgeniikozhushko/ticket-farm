@@ -1,3 +1,37 @@
+# Indexed participant summaries and bounded history (finding #15, part A)
+
+## Plan
+
+- [x] Inspect finding #15, the participant, lottery-dashboard, redemption, draw, and platform query/write paths, indexes, types, tests, and working tree; split the unrelated platform-directory work into part B.
+- [x] Add a `participant_summaries` collection, typed helper, and verified indexes: unique `{ orgId, email}`, email-order pagination, and normalized-name-order pagination. Store display `latestName` separately from its lowercased search key.
+- [x] In the existing registration and draw transactions, atomically upsert/increment each participant summary. Update redemption to use the existing conditional ticket update and its matching summary-counter update in one transaction, retaining every existing user-visible outcome.
+- [x] Replace the all-history participant aggregation with bounded indexed summary queries. Use explicit email and name prefix search modes with matching sort/cursor keys, rather than an unindexable `$or` query; preserve the page's list result contract.
+- [x] Cursor-paginate selected participant history by the stable registration date and fetch only tickets for that page. Bound the lottery dashboard's daily registrant display with a visible truncated-result indication rather than silently omitting rows.
+- [x] Add an idempotent backfill script that derives summaries from registrants and tickets. Document a maintenance-window deployment sequence: create indexes, pause registration/draw/redemption writes, run and validate the backfill, deploy the readers/writers, then resume writes. Do not run a live rebuild alongside unsynchronized writers.
+- [ ] Add disposable-replica-set coverage for summary correctness across registration/draw/redemption and the backfill script; focused unit coverage for read and redemption contracts is complete.
+- [ ] Re-run full local replica-set verification once the disposable server is reachable; lint, type check, production build, and diff checks passed.
+
+## Interim review
+
+### Changes
+
+- Added transactionally maintained participant summaries and indexed, cursor-bounded participant reads/history.
+- Added a 250-row daily dashboard display cap with a visible truncation message, index verification, and a maintenance-only summary rebuild script.
+
+### Verification
+
+- Focused participant, registration, draw, and redemption tests — 73 passed.
+- Mocked full suite — 29 files / 207 tests passed; four local-only integration files skipped without the test URI.
+- `pnpm lint`, `pnpm exec tsc --noEmit --incremental false`, `pnpm build`, and `git diff --check` — passed.
+
+### Remaining verification
+
+- The disposable localhost replica set timed out during connection setup even after attempting to start its existing server process. The real-database summaries/backfill checks remain pending; no production database was accessed.
+
+## Follow-up — part B: platform directory batching
+
+- Replace `listOrgDirectory`'s unpaginated 1 + 5N fan-out with a cursor-paginated, set-based query. Account for each organization's local date when calculating today's registrations, add the supporting organization cursor index to the required-index verifier, update the platform page with pagination controls, and cover the new query shape separately.
+
 # Self-healing MongoDB connection cache (finding #14)
 
 ## Plan

@@ -35,14 +35,15 @@ function formatDate(date: Date): string {
 export default async function ParticipantsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; email?: string; cursor?: string }>;
+  searchParams: Promise<{ q?: string; email?: string; cursor?: string; historyCursor?: string }>;
 }) {
-  const { q = "", email, cursor } = await searchParams;
-  const [participantPage, history] = await Promise.all([
+  const { q = "", email, cursor, historyCursor } = await searchParams;
+  const [participantPage, participantHistory] = await Promise.all([
     listOrgParticipants({ search: q, cursor, limit: 100 }),
-    email ? getParticipantHistory(email) : Promise.resolve([]),
+    email ? getParticipantHistory(email, historyCursor) : Promise.resolve({ entries: [], nextCursor: undefined }),
   ]);
   const { participants, nextCursor } = participantPage;
+  const { entries: history, nextCursor: nextHistoryCursor } = participantHistory;
 
   return (
     <DashboardShell title="Participants">
@@ -374,6 +375,24 @@ export default async function ParticipantsPage({
                     </TableBody>
                   </Table>
                 </div>
+                {nextHistoryCursor && (
+                  <div className="mt-4 flex justify-end">
+                    <Button asChild variant="outline" className="w-full sm:w-auto">
+                      <Link
+                        href={{
+                          pathname: "/dashboard/participants",
+                          query: {
+                            ...(q ? { q } : {}),
+                            email,
+                            historyCursor: nextHistoryCursor,
+                          },
+                        }}
+                      >
+                        Next history page
+                      </Link>
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}

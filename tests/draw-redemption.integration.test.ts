@@ -18,6 +18,7 @@ vi.mock("@/lib/mongodb", () => ({
   getTicketsCollection: async () => db.collection<Ticket>("tickets"),
   getRegistrantsCollection: async () => db.collection<Registrant>("registrants"),
   getLotteriesCollection: async () => db.collection<Lottery>("lotteries"),
+  getParticipantSummariesCollection: async () => db.collection("participant_summaries"),
   getResultEmailRecipientsCollection: async () => db.collection<ResultEmailRecipient>("result_email_recipients"),
   getEmailDispatchesCollection: async () => {
     const collection = db.collection<EmailDispatch>("email_dispatches");

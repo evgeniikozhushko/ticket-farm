@@ -10,6 +10,7 @@ import {
   getRegistrantsCollection,
   getLotteriesCollection,
   getTicketsCollection,
+  getParticipantSummariesCollection,
 } from "@/lib/mongodb";
 import { getTodayDateString } from "@/lib/date";
 import type {
@@ -25,6 +26,7 @@ import { dispatchWinnerEmailEvent } from "@/lib/email-dispatch-outbox";
 import { duplicateErrorIncludesField, isDuplicateKeyError } from "@/lib/mongo-errors";
 import type { EmailTicket } from "@/lib/email";
 import { DEFAULT_PICKUP_TIME } from "@/lib/pickup";
+import { recordWinnerTickets } from "@/lib/participant-summaries";
 
 const TICKET_ID_LENGTH = 12;
 const TICKET_ID_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -118,6 +120,7 @@ export async function drawTodayLottery(
     const lotteriesCollection = await getLotteriesCollection();
     const registrantsCollection = await getRegistrantsCollection();
     const ticketsCollection = await getTicketsCollection();
+    const participantSummariesCollection = await getParticipantSummariesCollection();
     const dispatchesCollection = await getEmailDispatchesCollection();
     const recipientsCollection = await getResultEmailRecipientsCollection();
     const client = await getClient();
@@ -183,6 +186,7 @@ export async function drawTodayLottery(
             }
             throw err;
           }
+          await recordWinnerTickets(participantSummariesCollection, ticketDocuments, session);
 
           const emailTickets = buildEmailTickets({
             tickets: ticketDocuments,

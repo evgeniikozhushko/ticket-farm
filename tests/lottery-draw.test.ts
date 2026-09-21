@@ -30,6 +30,7 @@ const recipientsCollection = vi.hoisted(() => ({
   insertMany: vi.fn(),
   countDocuments: vi.fn(),
 }));
+const participantSummariesCollection = vi.hoisted(() => ({ bulkWrite: vi.fn() }));
 
 vi.mock("@/lib/authz", () => ({
   requireRole: requireRoleMock,
@@ -59,6 +60,7 @@ vi.mock("@/lib/mongodb", () => ({
   getTicketsCollection: vi.fn(() => Promise.resolve(ticketsCollection)),
   getEmailDispatchesCollection: vi.fn(() => Promise.resolve(dispatchesCollection)),
   getResultEmailRecipientsCollection: vi.fn(() => Promise.resolve(recipientsCollection)),
+  getParticipantSummariesCollection: vi.fn(() => Promise.resolve(participantSummariesCollection)),
 }));
 
 async function loadAction() {

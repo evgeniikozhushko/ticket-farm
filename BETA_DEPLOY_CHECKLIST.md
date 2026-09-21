@@ -41,6 +41,11 @@ These should be true before promoting a public beta build.
       (`minPoolSize: 0`) with 5-second connect and server-selection timeouts. A
       transient initial connection failure can fail that request; the cached failed
       attempt is cleared so the next request connects again after Atlas recovers.
+- [ ] Before deploying participant-summary reads to an existing database: create
+      indexes, pause registration/draw/redemption writes, run
+      `pnpm tsx scripts/backfill-participant-summaries.ts`, validate its count,
+      deploy the new readers/writers, then resume writes. Do not rebuild while
+      unsynchronized application writers are live.
 
 ## 2. Vercel production env vars
 

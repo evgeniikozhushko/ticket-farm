@@ -50,6 +50,7 @@ vi.mock("@/lib/mongodb", () => ({
     db.collection<Organization>("organizations"),
   getPublicRegistrationRateLimitsCollection: async () =>
     db.collection("public_registration_rate_limits"),
+  getParticipantSummariesCollection: async () => db.collection("participant_summaries"),
   getTicketsCollection: async () => db.collection<Ticket>("tickets"),
   getEmailDispatchesCollection: async () =>
     db.collection<EmailDispatch>("email_dispatches"),

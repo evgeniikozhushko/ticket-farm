@@ -47,7 +47,7 @@ export async function getTodayRegistrants(): Promise<Registrant[]> {
     const date = getTodayDateString(org?.timezone);
     const collection = await getRegistrantsCollection();
 
-    return collection.find({ orgId, date }).sort({ enteredAt: 1 }).toArray();
+    return collection.find({ orgId, date }).sort({ enteredAt: 1 }).limit(250).toArray();
   } catch (err) {
     console.error("getTodayRegistrants error:", err);
     return [];

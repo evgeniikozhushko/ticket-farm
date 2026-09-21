@@ -2,8 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const auth = vi.hoisted(() => vi.fn());
 const collection = vi.hoisted(() => ({ findOne: vi.fn(), findOneAndUpdate: vi.fn() }));
+const summaries = vi.hoisted(() => ({ updateOne: vi.fn() }));
+const client = vi.hoisted(() => ({ withSession: async (callback: (session: unknown) => unknown) => callback({ withTransaction: async (transaction: (session: unknown) => unknown) => transaction({}) }) }));
 vi.mock("@/lib/authz", () => ({ requireRole: auth }));
-vi.mock("@/lib/mongodb", () => ({ getTicketsCollection: async () => collection }));
+vi.mock("@/lib/mongodb", () => ({ getClient: async () => client, getTicketsCollection: async () => collection, getParticipantSummariesCollection: async () => summaries }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 import { lookupTicketReference, redeemTicketReference } from "@/lib/actions/ticket-redemption.actions";
 
@@ -48,7 +50,7 @@ describe("staff reference redemption", () => {
     expect(collection.findOneAndUpdate).toHaveBeenCalledWith(
       { orgId: "org_a", ticketId: ticket.ticketId, status: "ACTIVE", checkedInAt: null },
       { $set: { status: "CHECKED_IN", checkedInAt: expect.any(Date) } },
-      { returnDocument: "after" },
+      expect.objectContaining({ returnDocument: "after" }),
     );
     expect(collection.findOne).not.toHaveBeenCalled();
     expect(auth).toHaveBeenCalledWith("org:member");

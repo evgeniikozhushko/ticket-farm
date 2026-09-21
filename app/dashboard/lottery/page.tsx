@@ -67,6 +67,11 @@ export default async function LotteryAdminPage() {
             <TicketRedemptionPanel />
 
             {/* All Registrants Table */}
+            {serializedStats.totalRegistrants > serializedRegistrants.length && (
+              <p className="px-4 text-sm text-muted-foreground md:px-6">
+                Showing the first {serializedRegistrants.length} of {serializedStats.totalRegistrants.toLocaleString()} registrants today.
+              </p>
+            )}
             <RegistrantsDataTable registrants={serializedRegistrants} />
           </div>
         </div>

@@ -105,6 +105,10 @@ export type ParticipantSummary = {
   checkedInTicketCount: number;
 };
 
+export type ParticipantSummaryDocument = ParticipantSummary & {
+  normalizedName: string;
+};
+
 export type ParticipantHistoryEntry = {
   date: string;
   enteredAt: Date;

@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
     countDocuments: vi.fn(),
   },
   limits: { findOneAndUpdate: vi.fn(), updateOne: vi.fn() },
+  summaries: { updateOne: vi.fn() },
   getLimits: vi.fn(),
   org: vi.fn(),
   headers: vi.fn(),
@@ -24,6 +25,7 @@ vi.mock("@/lib/mongodb", () => ({
   getLotteriesCollection: async () => mocks.lotteries,
   getRegistrantsCollection: async () => mocks.registrants,
   getPublicRegistrationRateLimitsCollection: mocks.getLimits,
+  getParticipantSummariesCollection: async () => mocks.summaries,
   getClient: async () => ({
     withSession: async (callback: (value: typeof session) => unknown) =>
       callback(session),

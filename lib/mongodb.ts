@@ -8,6 +8,7 @@ import type {
   EmailDispatch,
   ResultEmailRecipient,
   PublicRegistrationRateLimit,
+  ParticipantSummaryDocument,
 } from './types'
 
 const uri = process.env.MONGODB_URI
@@ -114,4 +115,9 @@ export async function getResultEmailRecipientsCollection(): Promise<Collection<R
 export async function getPublicRegistrationRateLimitsCollection(): Promise<Collection<PublicRegistrationRateLimit>> {
   const db = await getDb();
   return db.collection<PublicRegistrationRateLimit>("public_registration_rate_limits");
+}
+
+export async function getParticipantSummariesCollection(): Promise<Collection<ParticipantSummaryDocument>> {
+  const db = await getDb();
+  return db.collection<ParticipantSummaryDocument>("participant_summaries");
 }

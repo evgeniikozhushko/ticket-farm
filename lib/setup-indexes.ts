@@ -62,6 +62,19 @@ export async function setupIndexes() {
   console.log("  registrants: { orgId, name, email }");
 
   // ============================================================
+  // PARTICIPANT_SUMMARIES — bounded participant directory reads
+  // ============================================================
+  await db.collection('participant_summaries').createIndex(
+    { orgId: 1, email: 1 },
+    { unique: true, name: 'orgId_email_unique_idx', background: true }
+  );
+  await db.collection('participant_summaries').createIndex(
+    { orgId: 1, normalizedName: 1, email: 1 },
+    { name: 'orgId_normalizedName_email_idx', background: true }
+  );
+  console.log("  participant_summaries: org/email unique and name pagination");
+
+  // ============================================================
   // LOTTERIES — orgId-leading
   // ============================================================
 
@@ -230,6 +243,7 @@ export async function listIndexes() {
   const db = await getDb();
   const collections = [
     'registrants',
+    'participant_summaries',
     'tickets',
     'lotteries',
     'organizations',
@@ -284,6 +298,17 @@ const REQUIRED_DEPLOY_INDEXES: RequiredIndex[] = [
     collection: 'registrants',
     name: 'orgId_email_enteredAt_idx',
     key: { orgId: 1, email: 1, enteredAt: 1 },
+  },
+  {
+    collection: 'participant_summaries',
+    name: 'orgId_email_unique_idx',
+    key: { orgId: 1, email: 1 },
+    unique: true,
+  },
+  {
+    collection: 'participant_summaries',
+    name: 'orgId_normalizedName_email_idx',
+    key: { orgId: 1, normalizedName: 1, email: 1 },
   },
   {
     collection: 'registrants',

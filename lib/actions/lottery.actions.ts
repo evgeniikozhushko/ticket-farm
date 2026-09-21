@@ -10,6 +10,7 @@ import {
   getLotteriesCollection,
   getPublicRegistrationRateLimitsCollection,
   getRegistrantsCollection,
+  getParticipantSummariesCollection,
 } from "@/lib/mongodb";
 import { getTodayDateString } from "@/lib/date";
 import { isDuplicateKeyError } from "@/lib/mongo-errors";
@@ -17,6 +18,7 @@ import { getOrgBySlug } from "@/lib/orgs";
 import { parseOrgSlug } from "@/lib/slugs";
 import { verifyRegistrationChallenge } from "@/lib/turnstile";
 import type { Registrant } from "@/lib/types";
+import { recordParticipantRegistration } from "@/lib/participant-summaries";
 
 type EnterLotteryResult = { success: true } | { success: false; error: string };
 
@@ -176,6 +178,7 @@ export async function enterLottery(
     );
     const date = getTodayDateString(org.timezone);
     const registrantsCollection = await getRegistrantsCollection();
+    const participantSummariesCollection = await getParticipantSummariesCollection();
 
     const existingRegistrant = await registrantsCollection.findOne({
       orgId,
@@ -300,6 +303,11 @@ export async function enterLottery(
               throw new AdmissionError(UNAVAILABLE_MESSAGE);
             }
             await registrantsCollection.insertOne(newRegistrant, { session });
+            await recordParticipantRegistration(
+              participantSummariesCollection,
+              newRegistrant,
+              session,
+            );
           },
           {
             readConcern: { level: "snapshot" },

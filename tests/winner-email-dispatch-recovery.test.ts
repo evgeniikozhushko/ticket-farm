@@ -139,6 +139,7 @@ vi.mock("@/lib/mongodb", () => ({
   getRegistrantsCollection: vi.fn(() => Promise.resolve(registrantsCollection)),
   getTicketsCollection: vi.fn(() => Promise.resolve(ticketsCollection)),
   getEmailDispatchesCollection: vi.fn(() => Promise.resolve(store.collection)),
+  getParticipantSummariesCollection: vi.fn(() => Promise.resolve({ bulkWrite: vi.fn(), updateOne: vi.fn() })),
   getResultEmailRecipientsCollection: vi.fn(() => Promise.resolve(recipientsCollection)),
 }));
 

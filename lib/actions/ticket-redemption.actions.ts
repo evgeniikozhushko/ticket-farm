@@ -1,7 +1,7 @@
 "use server";
 
 import { requireRole } from "@/lib/authz";
-import { getTicketsCollection } from "@/lib/mongodb";
+import { getClient, getParticipantSummariesCollection, getTicketsCollection } from "@/lib/mongodb";
 import type { Ticket } from "@/lib/types";
 import { revalidatePath } from "next/cache";
 
@@ -51,11 +51,25 @@ export async function redeemTicketReference(reference: string): Promise<Redempti
   if (!ticketId) return invalid;
   try {
     const collection = await getTicketsCollection();
-    const ticket = await collection.findOneAndUpdate(
-      { orgId, ticketId, status: "ACTIVE", checkedInAt: null },
-      { $set: { status: "CHECKED_IN", checkedInAt: new Date() } },
-      { returnDocument: "after" },
-    );
+    const summaries = await getParticipantSummariesCollection();
+    const client = await getClient();
+    let ticket: Ticket | null = null;
+    await client.withSession(async (session) => {
+      await session.withTransaction(async () => {
+        ticket = await collection.findOneAndUpdate(
+          { orgId, ticketId, status: "ACTIVE", checkedInAt: null },
+          { $set: { status: "CHECKED_IN", checkedInAt: new Date() } },
+          { returnDocument: "after", session },
+        );
+        if (ticket) {
+          await summaries.updateOne(
+            { orgId, email: ticket.email },
+            { $inc: { activeTicketCount: -1, checkedInTicketCount: 1 } },
+            { session },
+          );
+        }
+      });
+    });
     if (ticket) {
       revalidatePath("/dashboard/lottery");
       revalidatePath("/dashboard/participants");
