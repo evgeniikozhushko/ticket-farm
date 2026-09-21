@@ -1,3 +1,32 @@
+# Self-healing MongoDB connection cache (finding #14)
+
+## Plan
+
+- [x] Inspect the MongoDB connection cache, test conventions, deployment checklist, and working tree.
+- [x] Add fixed beta pool/timeout options and clear only a failed cached connection attempt.
+- [x] Add isolated cache tests for recovery, concurrent sharing, successful reuse, and exact driver options.
+- [x] Document the Atlas connection limits and next-request recovery behavior.
+- [x] Run targeted and full test suites, lint, type check, production build, and diff checks; review the final diff.
+
+## Review
+
+### Changes
+
+- Added a fixed 10-connection maximum pool, zero minimum pool, and 5-second MongoDB connect/server-selection timeouts.
+- Clear a rejected cached connection promise only when it is still the active attempt, allowing the next request to reconnect without changing successful reuse or concurrent sharing.
+- Added isolated cache coverage and an Atlas operational checklist note. No dependencies or lifecycle APIs were added.
+
+### Verification
+
+- `pnpm test tests/mongodb.test.ts` — 4 tests passed.
+- `TICKET_FARM_TEST_MONGODB_URI='mongodb://127.0.0.1:27187/?replicaSet=ticketfarmtest' pnpm test` — 33 files, 234 tests passed.
+- `pnpm lint`, `pnpm exec tsc --noEmit --incremental false`, `pnpm build`, and `git diff --check` — passed.
+
+### Notes
+
+- The first full-suite attempt found the disposable localhost replica set stopped; after starting the existing `/private/tmp` test replica set, the full suite passed. No production database was accessed.
+- Reviewed scope: only the MongoDB cache, dedicated tests, Atlas checklist, and finding #14 task record changed.
+
 # Harden public registration abuse controls (finding #6)
 
 ## Approved plan

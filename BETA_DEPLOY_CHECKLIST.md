@@ -37,6 +37,10 @@ These should be true before promoting a public beta build.
       `registrants`, `tickets`, `lotteries`, `organizations`,
       `processed_webhook_events`, `email_dispatches`, `result_email_recipients`, and
       `public_registration_rate_limits`.
+- [ ] Each warm Vercel instance uses a fixed MongoDB pool of at most 10 connections
+      (`minPoolSize: 0`) with 5-second connect and server-selection timeouts. A
+      transient initial connection failure can fail that request; the cached failed
+      attempt is cleared so the next request connects again after Atlas recovers.
 
 ## 2. Vercel production env vars
 

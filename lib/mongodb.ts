@@ -1,4 +1,4 @@
-import { MongoClient, Db, Collection } from 'mongodb'
+import { MongoClient, Db, Collection, type MongoClientOptions } from 'mongodb'
 import type {
   Registrant,
   Lottery,
@@ -12,6 +12,13 @@ import type {
 
 const uri = process.env.MONGODB_URI
 const dbName = process.env.MONGODB_DB_NAME
+
+const mongoClientOptions: MongoClientOptions = {
+  maxPoolSize: 10,
+  minPoolSize: 0,
+  connectTimeoutMS: 5_000,
+  serverSelectionTimeoutMS: 5_000,
+};
 
 
 if (!uri) {
@@ -48,7 +55,13 @@ export async function getClient(): Promise<MongoClient>  {
   }
 
   if (!mongoClientCache.promise) {
-    mongoClientCache.promise = MongoClient.connect(uri!)
+    const connectionPromise = MongoClient.connect(uri!, mongoClientOptions).catch((error) => {
+      if (mongoClientCache.promise === connectionPromise) {
+        mongoClientCache.promise = null;
+      }
+      throw error;
+    });
+    mongoClientCache.promise = connectionPromise;
   }
 
   mongoClientCache.client = await mongoClientCache.promise
