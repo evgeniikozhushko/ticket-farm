@@ -64,6 +64,7 @@ export function LotteryDrawPanel({
   );
   const [isLoading, setIsLoading] = useState(false);
   const [isRetryingEmails, setIsRetryingEmails] = useState(false);
+  const [retryDate, setRetryDate] = useState("");
   const [lastDrawnAt, setLastDrawnAt] = useState<string | undefined>(drawnAt);
   const [emailDispatchError, setEmailDispatchError] = useState<
     string | undefined
@@ -163,7 +164,7 @@ export function LotteryDrawPanel({
     setIsRetryingEmails(true);
 
     try {
-      const result = await retryTodayWinnerEmails();
+      const result = await retryTodayWinnerEmails(retryDate || undefined);
 
       if (!result.success) {
         toast.error(result.error);
@@ -194,8 +195,8 @@ export function LotteryDrawPanel({
     }
   };
 
-  const emailsSent = winners.filter((w) => w.emailSent).length;
-  const emailsFailed = winners.filter((w) => w.emailSent === false).length;
+  const emailsSent = winners.filter((w) => w.emailSent && w.emailDelivery !== "bounced" && w.emailDelivery !== "failed").length;
+  const emailsFailed = winners.filter((w) => w.emailSent === false || w.emailDelivery === "bounced" || w.emailDelivery === "failed").length;
   const emailsPending = winners.filter((w) => w.emailSent === undefined).length;
 
   return (
@@ -322,7 +323,7 @@ export function LotteryDrawPanel({
                     <Alert className="border-green-500/50 bg-green-50 dark:bg-green-950/20">
                       <IconMail className="size-4 text-green-600 dark:text-green-400" />
                       <AlertDescription className="text-green-800 dark:text-green-200">
-                        Emails successfully sent to {emailsSent} winner
+                        Emails accepted by Resend for {emailsSent} winner
                         {emailsSent !== 1 ? "s" : ""}
                       </AlertDescription>
                     </Alert>
@@ -332,9 +333,8 @@ export function LotteryDrawPanel({
                     <Alert className="border-red-500/50 bg-red-50 dark:bg-red-950/20">
                       <IconMailOff className="size-4 text-red-600 dark:text-red-400" />
                       <AlertDescription className="text-red-800 dark:text-red-200">
-                        Failed to send emails to {emailsFailed} winner
-                        {emailsFailed !== 1 ? "s" : ""}. Winners were selected
-                        successfully but email delivery failed.
+                        Email sending or delivery failed for {emailsFailed} winner
+                        {emailsFailed !== 1 ? "s" : ""}. Winners were selected successfully.
                         <br />
                         <span className="text-sm mt-1 block">
                           Using (hello@ticketfarm.ca). Emails only send to
@@ -367,23 +367,6 @@ export function LotteryDrawPanel({
                 </>
               );
             })()}
-
-            {isAdmin && winners.length > 0 && (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleRetryEmails}
-                disabled={isRetryingEmails}
-                className="w-full sm:w-fit"
-              >
-                {isRetryingEmails ? (
-                  <IconLoader className="mr-2 size-4 animate-spin" />
-                ) : (
-                  <IconRefresh className="mr-2 size-4" />
-                )}
-                Retry unsent result emails
-              </Button>
-            )}
 
             {winners.length > 0 && (
               <>
@@ -466,7 +449,12 @@ export function LotteryDrawPanel({
                             {winner.ticketId || "—"}
                           </TableCell>
                           <TableCell className="text-center">
-                            {winner.emailSent === true ? (
+                            {winner.emailDelivery === "bounced" || winner.emailDelivery === "failed" ? (
+                              <IconMailOff
+                                className="inline-block size-4 text-red-600 dark:text-red-400"
+                                title={`Email ${winner.emailDelivery} at the provider`}
+                              />
+                            ) : winner.emailSent === true ? (
                               <IconMail
                                 className="inline-block size-4 text-green-600 dark:text-green-400"
                                 title="Email sent successfully"
@@ -491,6 +479,25 @@ export function LotteryDrawPanel({
                 </div>
               </>
             )}
+          </div>
+        )}
+        {isAdmin && (
+          <div className="mt-6 flex flex-wrap items-end gap-3 border-t pt-5">
+            <div className="space-y-2">
+              <Label htmlFor="retry-result-date">Retry result emails for draw date</Label>
+              <Input
+                id="retry-result-date"
+                type="date"
+                value={retryDate}
+                onChange={(event) => setRetryDate(event.target.value)}
+                className="w-auto"
+              />
+              <p className="text-xs text-muted-foreground">Leave blank for today.</p>
+            </div>
+            <Button type="button" variant="outline" onClick={handleRetryEmails} disabled={isRetryingEmails}>
+              {isRetryingEmails ? <IconLoader className="mr-2 size-4 animate-spin" /> : <IconRefresh className="mr-2 size-4" />}
+              Retry unsent result emails
+            </Button>
           </div>
         )}
       </CardContent>

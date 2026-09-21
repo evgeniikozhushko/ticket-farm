@@ -193,6 +193,7 @@ export async function getParticipantHistory(
       checkedInAt: ticket?.checkedInAt?.toISOString(),
       emailSent: ticket ? ticket.emailSent : registrant.nonWinnerEmailSent,
       emailError: ticket ? ticket.emailError : registrant.nonWinnerEmailError,
+      emailDelivery: ticket ? ticket.emailDelivery : registrant.nonWinnerEmailDelivery,
     };
   });
 }

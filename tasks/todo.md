@@ -382,3 +382,20 @@ Remaining work is all dashboard-driven and must be performed in Vercel/Atlas/Cle
 
 - Operators must check Inngest runs during the pilot; an independent external heartbeat monitor was excluded by request. A completely stopped Inngest integration cannot report its own outage.
 - Bounded delivery and historical retry tooling remain finding #9.
+
+# Reliable result-email delivery (finding #9)
+
+## Proposed plan
+
+- [ ] Confirm the current Resend team rate and deployment limits; set a conservative shared send pace and document the supported draw size and delivery target for beta.
+- [ ] Replace new draw and retry outbox payloads with a small dispatch reference. Persist the exact winner and non-winner recipient snapshot in bounded records within the draw transaction, and continue accepting already-queued legacy payloads.
+- [ ] Send bounded, paced recipient batches with durable Inngest checkpoints. Coordinate original and manual runs per recipient, retain stable provider idempotency keys, and prevent late failures from erasing a successful state.
+- [ ] Save Resend message IDs and handle signed delivery/bounce/failure webhooks with idempotent, ordered updates; document the required webhook secret and endpoint setup.
+- [ ] Add an admin-only historical-date retry path that uses the committed draw snapshot and cannot select later or unrelated registrations.
+- [ ] Test provider 429/timeout, database failure, overlapping retries, batch boundaries, legacy events, webhook replay/order, and historical retry. Run targeted and full tests, lint, type check, build, and diff check; review the final changes.
+
+## Scope notes
+
+- Resend's documented default is 10 requests/second per team, but the account's actual limit must be checked before claiming a delivery deadline. Its idempotency keys expire after 24 hours, so ambiguous sends older than that must be surfaced for operator reconciliation instead of blindly resent.
+- The new dispatch format must coexist with rows and Inngest events created before deployment; no production data migration is assumed.
+- Webhook delivery tracking reports provider outcomes, not guaranteed inbox receipt.

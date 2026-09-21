@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import {
   getClient,
   getEmailDispatchesCollection,
+  getResultEmailRecipientsCollection,
   getRegistrantsCollection,
   getLotteriesCollection,
   getTicketsCollection,
@@ -118,11 +119,13 @@ export async function drawTodayLottery(
     const registrantsCollection = await getRegistrantsCollection();
     const ticketsCollection = await getTicketsCollection();
     const dispatchesCollection = await getEmailDispatchesCollection();
+    const recipientsCollection = await getResultEmailRecipientsCollection();
     const client = await getClient();
     const drawnAt = new Date();
 
     let selectedWinners: Registrant[] = [];
     let ticketDocuments: Omit<Ticket, "_id">[] = [];
+    const drawDispatchId = new ObjectId();
 
     try {
       await client.withSession(async (session) => {
@@ -190,6 +193,43 @@ export async function drawTodayLottery(
           });
 
           const now = new Date();
+          await recipientsCollection.insertMany(
+            [
+              ...emailTickets.map((ticket) => {
+                const _id = new ObjectId();
+                return {
+                  _id,
+                  drawDispatchId,
+                  orgId,
+                  date,
+                  kind: "winner" as const,
+                  recipientId: ticket.ticketId,
+                  ticket: { ...ticket, recipientRecordId: _id.toString() },
+                  status: "pending" as const,
+                  attempts: 0,
+                  createdAt: now,
+                  updatedAt: now,
+                };
+              }),
+              ...nonWinners.map((nonWinner) => {
+                const _id = new ObjectId();
+                return {
+                  _id,
+                  drawDispatchId,
+                  orgId,
+                  date,
+                  kind: "non_winner" as const,
+                  recipientId: nonWinner.registrantId,
+                  nonWinner: { ...nonWinner, recipientRecordId: _id.toString() },
+                  status: "pending" as const,
+                  attempts: 0,
+                  createdAt: now,
+                  updatedAt: now,
+                };
+              }),
+            ],
+            { session }
+          );
           await lotteriesCollection.updateOne(
             { orgId, date },
             {
@@ -203,11 +243,12 @@ export async function drawTodayLottery(
 
           await dispatchesCollection.insertOne(
             {
+              _id: drawDispatchId,
               orgId,
               date,
               eventName: "lottery/draw.completed",
               dispatchKind: "draw",
-              payload: { orgId, date, tickets: emailTickets, nonWinners },
+              payload: { orgId, date, dispatchId: drawDispatchId.toString() },
               status: "pending",
               attempts: 0,
               createdAt: now,
@@ -262,7 +303,7 @@ export async function drawTodayLottery(
   }
 }
 
-export async function retryTodayWinnerEmails(): Promise<RetryWinnerEmailsResult> {
+export async function retryTodayWinnerEmails(requestedDate?: string): Promise<RetryWinnerEmailsResult> {
   try {
     const { orgId } = await requireRole("org:admin");
 
@@ -271,14 +312,71 @@ export async function retryTodayWinnerEmails(): Promise<RetryWinnerEmailsResult>
       return { success: false, error: "Organization not found." };
     }
 
-    const date = getTodayDateString(org.timezone);
+    const today = getTodayDateString(org.timezone);
+    const date = requestedDate ?? today;
+    if (
+      !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
+      Number.isNaN(Date.parse(`${date}T00:00:00Z`)) ||
+      new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) !== date ||
+      date > today
+    ) {
+      return { success: false, error: "Choose a valid draw date that is not in the future." };
+    }
     const ticketsCollection = await getTicketsCollection();
     const dispatchesCollection = await getEmailDispatchesCollection();
 
     const originalDraw = await dispatchesCollection.findOne({
       orgId, date, eventName: "lottery/draw.completed", dispatchKind: "draw",
     });
-    const nonWinnerSnapshot = originalDraw?.payload.nonWinners ?? [];
+    if (!originalDraw) {
+      return { success: false, error: "No completed draw exists for that date." };
+    }
+    if (originalDraw.payload.dispatchId) {
+      const recipientsCollection = await getResultEmailRecipientsCollection();
+      const queued = await recipientsCollection.countDocuments({
+        drawDispatchId: new ObjectId(originalDraw.payload.dispatchId),
+        status: { $in: ["pending", "failed"] },
+        attempts: { $lt: 10 },
+      });
+      if (queued === 0) {
+        const needsReview = await recipientsCollection.countDocuments({
+          drawDispatchId: new ObjectId(originalDraw.payload.dispatchId),
+          $or: [
+            { status: "uncertain" },
+            { status: "failed", attempts: { $gte: 10 } },
+          ],
+        });
+        if (needsReview) {
+          return { success: false, error: `${needsReview} result email${needsReview === 1 ? "" : "s"} ${needsReview === 1 ? "needs" : "need"} provider reconciliation before retrying.` };
+        }
+        return { success: true, queued: 0 };
+      }
+      const now = new Date();
+      let dispatchId: ObjectId;
+      try {
+        const inserted = await dispatchesCollection.insertOne({
+          orgId, date, eventName: "lottery/draw.completed", dispatchKind: "manual_retry",
+          payload: { orgId, date, dispatchId: originalDraw.payload.dispatchId },
+          status: "pending", attempts: 0, createdAt: now, updatedAt: now,
+        });
+        dispatchId = inserted.insertedId;
+      } catch (err) {
+        if (isDuplicateKeyError(err)) {
+          return { success: false, error: "A result email retry is already queued or dispatching." };
+        }
+        throw err;
+      }
+      let emailDispatchError: string | undefined;
+      try {
+        await dispatchWinnerEmailEvent({ dispatchId });
+      } catch (err) {
+        console.error("[retryTodayWinnerEmails] Email dispatch failed:", err);
+        emailDispatchError = err instanceof Error ? err.message : "Result email retry dispatch failed.";
+      }
+      revalidatePath("/dashboard/lottery");
+      return { success: true, queued, ...(emailDispatchError ? { emailDispatchError } : {}) };
+    }
+    const nonWinnerSnapshot = originalDraw.payload.nonWinners ?? [];
     const registrantsCollection = await getRegistrantsCollection();
     const unsentNonWinners = nonWinnerSnapshot.length
       ? await registrantsCollection.find({
@@ -295,17 +393,12 @@ export async function retryTodayWinnerEmails(): Promise<RetryWinnerEmailsResult>
       .sort({ ticketNumber: 1 })
       .toArray();
 
-    if (unsentTickets.length === 0 && nonWinners.length === 0) {
+    const unsentTicketIds = new Set(unsentTickets.map((ticket) => ticket.ticketId));
+    const emailTickets = (originalDraw.payload.tickets ?? [])
+      .filter((ticket) => unsentTicketIds.has(ticket.ticketId));
+    if (emailTickets.length === 0 && nonWinners.length === 0) {
       return { success: true, queued: 0 };
     }
-
-    const emailTickets = buildEmailTickets({
-      tickets: unsentTickets,
-      orgName: org.name,
-      pickupLocation: org.pickupLocation,
-      emailFromAddress: org.emailFromAddress,
-      emailFromName: org.emailFromName,
-    });
     const now = new Date();
 
     let dispatchId: ObjectId;
@@ -345,7 +438,7 @@ export async function retryTodayWinnerEmails(): Promise<RetryWinnerEmailsResult>
 
     return {
       success: true,
-      queued: unsentTickets.length + nonWinners.length,
+      queued: emailTickets.length + nonWinners.length,
       ...(emailDispatchError ? { emailDispatchError } : {}),
     };
   } catch (err) {

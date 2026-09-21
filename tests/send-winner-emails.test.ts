@@ -5,6 +5,7 @@ const nonWinnerNotifications = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/non-winner-notifications", () => ({ sendNonWinnerNotifications: nonWinnerNotifications }));
 
 const sendBulkWinnerEmailsMock = vi.hoisted(() => vi.fn());
+const processBatchMock = vi.hoisted(() => vi.fn());
 const ticketsCollection = vi.hoisted(() => ({
   find: vi.fn(),
   bulkWrite: vi.fn(),
@@ -16,6 +17,7 @@ const createFunctionMock = vi.hoisted(() =>
 vi.mock("@/lib/email", () => ({
   sendBulkWinnerEmails: sendBulkWinnerEmailsMock,
 }));
+vi.mock("@/lib/result-email-delivery", () => ({ processResultEmailBatch: processBatchMock }));
 
 vi.mock("@/lib/mongodb", () => ({
   getTicketsCollection: vi.fn(() => Promise.resolve(ticketsCollection)),
@@ -86,6 +88,7 @@ async function runFunction(nonWinners: NonWinnerEmail[] = []) {
 describe("sendWinnerEmailsFunction", () => {
   beforeEach(() => {
     sendBulkWinnerEmailsMock.mockReset();
+    processBatchMock.mockReset();
     ticketsCollection.find.mockReset();
     ticketsCollection.bulkWrite.mockReset().mockResolvedValue({ modifiedCount: 1 });
     nonWinnerNotifications.mockReset().mockResolvedValue({ sent: 0, skipped: 0, failed: 0 });
@@ -133,6 +136,7 @@ describe("sendWinnerEmailsFunction", () => {
             $set: {
               emailSent: true,
               emailSentAt: expect.any(Date),
+              emailMessageId: "msg_1",
             },
             $unset: { emailError: "" },
           },
@@ -173,5 +177,37 @@ describe("sendWinnerEmailsFunction", () => {
         },
       },
     ]);
+  });
+
+  it("checkpoints bounded recipient batches and advances by record ID", async () => {
+    processBatchMock.mockResolvedValueOnce({ sent: 5, failed: 0, skipped: 0, uncertain: 0, lastId: "507f1f77bcf86cd799439011", done: false })
+      .mockResolvedValueOnce({ sent: 1, failed: 0, skipped: 0, uncertain: 0, lastId: "507f1f77bcf86cd799439012", done: true });
+    vi.resetModules();
+    const { sendWinnerEmailsFunction } = await import("@/inngest/functions/send-winner-emails");
+    const handler = sendWinnerEmailsFunction as unknown as (input: unknown) => Promise<unknown>;
+    const step = { run: vi.fn(async (_name: string, callback: () => Promise<unknown>) => callback()) };
+    await expect(handler({
+      event: { data: { orgId: "org_1", date: "2026-05-28", dispatchId: "507f1f77bcf86cd799439010" } },
+      step,
+    })).resolves.toMatchObject({ sent: 6, failed: 0 });
+    expect(step.run.mock.calls.map((call) => call[0])).toEqual(["result-email-batch-0", "result-email-batch-1"]);
+    expect(processBatchMock).toHaveBeenNthCalledWith(2, "507f1f77bcf86cd799439010", "507f1f77bcf86cd799439011");
+  });
+
+  it("leaves a failed recipient batch retryable within its Inngest step", async () => {
+    processBatchMock.mockResolvedValueOnce({ sent: 0, failed: 1, skipped: 0, uncertain: 0, done: true })
+      .mockResolvedValueOnce({ sent: 1, failed: 0, skipped: 0, uncertain: 0, done: true });
+    vi.resetModules();
+    const { sendWinnerEmailsFunction } = await import("@/inngest/functions/send-winner-emails");
+    const handler = sendWinnerEmailsFunction as unknown as (input: unknown) => Promise<unknown>;
+    const step = { run: vi.fn(async (_name: string, callback: () => Promise<unknown>) => {
+      try { return await callback(); } catch { return callback(); }
+    }) };
+    await expect(handler({
+      event: { data: { orgId: "org_1", date: "2026-05-28", dispatchId: "507f1f77bcf86cd799439010" } },
+      step,
+    })).resolves.toMatchObject({ sent: 1 });
+    expect(processBatchMock).toHaveBeenCalledTimes(2);
+    expect(step.run).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,5 +1,8 @@
 # Resend Email Service - Usage Summary
 
+> Historical notes. Current result-email delivery uses durable recipient records,
+> paced Inngest batches, and signed Resend webhooks; see `BETA_DEPLOY_CHECKLIST.md`.
+
 ## Overview
 
 Resend is used to send automated winner notification emails when a lottery draw is completed. The app sends personalized emails to winners containing their ticket information and pickup details.
@@ -251,4 +254,3 @@ export interface EmailResult {
   messageId?: string;
 }
 ```
-

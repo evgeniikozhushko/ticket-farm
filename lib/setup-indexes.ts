@@ -162,6 +162,23 @@ export async function setupIndexes() {
   );
   console.log("  email_dispatches: active manual retry unique guard");
 
+  await db.collection('result_email_recipients').createIndex(
+    { orgId: 1, date: 1, kind: 1, recipientId: 1 },
+    { unique: true, name: 'org_date_kind_recipient_unique_idx', background: true }
+  );
+  await db.collection('result_email_recipients').createIndex(
+    { drawDispatchId: 1, _id: 1 },
+    { name: 'draw_dispatch_cursor_idx', background: true }
+  );
+  await db.collection('result_email_recipients').createIndex(
+    { messageId: 1 },
+    { name: 'message_id_idx', background: true, sparse: true }
+  );
+  await db.collection('result_email_recipients').createIndex(
+    { status: 1, updatedAt: 1, attempts: 1 },
+    { name: 'status_updatedAt_attempts_idx', background: true }
+  );
+
   // ============================================================
   // PUBLIC_REGISTRATION_RATE_LIMITS — anti-abuse counters
   // ============================================================
@@ -218,6 +235,7 @@ export async function listIndexes() {
     'organizations',
     'processed_webhook_events',
     'email_dispatches',
+    'result_email_recipients',
     'public_registration_rate_limits',
   ];
   console.log("\nCurrent Indexes:\n");
@@ -241,6 +259,27 @@ type RequiredIndex = {
 };
 
 const REQUIRED_DEPLOY_INDEXES: RequiredIndex[] = [
+  {
+    collection: 'result_email_recipients',
+    name: 'org_date_kind_recipient_unique_idx',
+    key: { orgId: 1, date: 1, kind: 1, recipientId: 1 },
+    unique: true,
+  },
+  {
+    collection: 'result_email_recipients',
+    name: 'draw_dispatch_cursor_idx',
+    key: { drawDispatchId: 1, _id: 1 },
+  },
+  {
+    collection: 'result_email_recipients',
+    name: 'message_id_idx',
+    key: { messageId: 1 },
+  },
+  {
+    collection: 'result_email_recipients',
+    name: 'status_updatedAt_attempts_idx',
+    key: { status: 1, updatedAt: 1, attempts: 1 },
+  },
   {
     collection: 'registrants',
     name: 'orgId_email_enteredAt_idx',

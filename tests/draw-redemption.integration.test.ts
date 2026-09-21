@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { MongoClient, ObjectId, type Db } from "mongodb";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import type { EmailDispatch, Lottery, Registrant, Ticket } from "@/lib/types";
+import type { EmailDispatch, Lottery, Registrant, ResultEmailRecipient, Ticket } from "@/lib/types";
 
 // Opt-in, disposable LOCAL replica set only. Never uses the app's database URI.
 const uri = process.env.TICKET_FARM_TEST_MONGODB_URI;
@@ -18,6 +18,7 @@ vi.mock("@/lib/mongodb", () => ({
   getTicketsCollection: async () => db.collection<Ticket>("tickets"),
   getRegistrantsCollection: async () => db.collection<Registrant>("registrants"),
   getLotteriesCollection: async () => db.collection<Lottery>("lotteries"),
+  getResultEmailRecipientsCollection: async () => db.collection<ResultEmailRecipient>("result_email_recipients"),
   getEmailDispatchesCollection: async () => {
     const collection = db.collection<EmailDispatch>("email_dispatches");
     return {
@@ -44,7 +45,7 @@ describe.skipIf(!uri)("real MongoDB draw and redemption", () => {
   beforeEach(async () => {
     hooks.failOutbox = false;
     hooks.dispatch.mockReset().mockResolvedValue(true);
-    for (const name of ["registrants", "lotteries", "tickets", "email_dispatches"]) await db.collection(name).deleteMany({});
+    for (const name of ["registrants", "lotteries", "tickets", "email_dispatches", "result_email_recipients"]) await db.collection(name).deleteMany({});
   });
 
   async function seedDraw() {
@@ -68,16 +69,21 @@ describe.skipIf(!uri)("real MongoDB draw and redemption", () => {
     expect(await drawTodayLottery(1)).toMatchObject({ success: true });
     const original = (await db.collection<EmailDispatch>("email_dispatches").findOne({ dispatchKind: "draw" }))!;
     const winner = (await db.collection<Ticket>("tickets").findOne({}))!;
-    expect(original.payload.tickets.map((t) => t.email)).toEqual([winner.email]);
-    expect(original.payload.nonWinners!.map((r) => r.registrantId).sort()).toEqual(entrants.filter((r) => r.email !== winner.email).map((r) => r._id.toString()).sort());
+    expect(original.payload).toEqual({ orgId: "org_a", date: "2026-09-14", dispatchId: original._id!.toString() });
+    const recipients = await db.collection<ResultEmailRecipient>("result_email_recipients").find({ drawDispatchId: original._id }).toArray();
+    expect(recipients.filter((r) => r.kind === "winner").map((r) => r.ticket!.email)).toEqual([winner.email]);
+    expect(recipients.filter((r) => r.kind === "non_winner").map((r) => r.nonWinner!.registrantId).sort()).toEqual(entrants.filter((r) => r.email !== winner.email).map((r) => r._id.toString()).sort());
     await db.collection("registrants").insertOne({ orgId: "org_a", date: "2026-09-14", email: "late@example.com", name: "Late", enteredAt: new Date() });
-    const alreadySent = original.payload.nonWinners![0];
+    const alreadySent = recipients.find((r) => r.kind === "non_winner")!.nonWinner!;
     await db.collection("registrants").updateOne({ _id: new ObjectId(alreadySent.registrantId) }, { $set: { nonWinnerEmailSent: true } });
     await db.collection("tickets").updateOne({ _id: winner._id }, { $set: { emailSent: true } });
+    await db.collection("result_email_recipients").updateMany(
+      { $or: [{ recipientId: alreadySent.registrantId }, { recipientId: winner.ticketId }] },
+      { $set: { status: "accepted" } }
+    );
     expect(await retryTodayWinnerEmails()).toMatchObject({ success: true, queued: 1 });
     const retry = (await db.collection<EmailDispatch>("email_dispatches").findOne({ dispatchKind: "manual_retry" }))!;
-    expect(retry.payload.tickets).toEqual([]);
-    expect(retry.payload.nonWinners).toEqual(original.payload.nonWinners!.filter((r) => r.registrantId !== alreadySent.registrantId));
+    expect(retry.payload).toEqual(original.payload);
   });
 
   it("rolls tickets, results, and notifications back together when outbox persistence fails", async () => {
@@ -87,6 +93,7 @@ describe.skipIf(!uri)("real MongoDB draw and redemption", () => {
     expect(await drawTodayLottery(1)).toMatchObject({ success: false });
     expect(await db.collection("tickets").countDocuments()).toBe(0);
     expect(await db.collection("email_dispatches").countDocuments()).toBe(0);
+    expect(await db.collection("result_email_recipients").countDocuments()).toBe(0);
     expect(await db.collection("lotteries").findOne({ orgId: "org_a" })).toMatchObject({ status: "OPEN" });
     expect(hooks.dispatch).not.toHaveBeenCalled();
   });

@@ -1,5 +1,10 @@
 📧 Complete Resend Email Implementation Guide
 
+> Historical implementation notes. For the current result-email pipeline, see
+> `lib/result-email-delivery.ts`, `inngest/functions/send-winner-emails.ts`,
+> and `BETA_DEPLOY_CHECKLIST.md`. The code examples below predate the durable
+> recipient records, shared pacing, and signed delivery webhooks.
+
 1. Email Template Component
 File: emails/winner-ticket-email.tsx This is a React component that gets rendered into HTML email:
 import {

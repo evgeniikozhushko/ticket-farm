@@ -4,6 +4,7 @@ import WinnerTicketEmail from "@/emails/winner-ticket-email";
 import NonWinnerEmail from "@/emails/non-winner-email";
 const send = vi.hoisted(() => vi.fn());
 vi.mock("resend", () => ({ Resend: class { emails = { send }; } }));
+vi.mock("@/lib/email-send-pace", () => ({ waitForResultEmailSendSlot: vi.fn() }));
 import { sendWinnerEmail, sendNonWinnerEmail } from "@/lib/email";
 
 const ticket = { name: "Ada", email: "ada@example.com", orgName: "Community Org", ticketNumber: 27, ticketId: "4ISW51HA9O0Z", date: "2026-09-14", pickupTime: "5 PM", pickupLocation: "Community desk", emailFromName: "Org", emailFromAddress: "hello@ticketfarm.ca" };
@@ -27,4 +28,11 @@ it("uses stable provider keys on retries and targets the saved email", async () 
   const recipient = { ...ticket, registrantId: "507f1f77bcf86cd799439011" };
   await sendNonWinnerEmail(recipient);
   expect(send).toHaveBeenLastCalledWith(expect.objectContaining({ to: [ticket.email] }), { idempotencyKey: `non-winner:${recipient.registrantId}:${ticket.date}` });
+});
+it("tags new recipient emails for webhook correlation", async () => {
+  await sendWinnerEmail({ ...ticket, recipientRecordId: "507f1f77bcf86cd799439011" });
+  expect(send).toHaveBeenCalledWith(
+    expect.objectContaining({ tags: [{ name: "tf_recipient", value: "507f1f77bcf86cd799439011" }] }),
+    { idempotencyKey: `winner:${ticket.ticketId}` }
+  );
 });

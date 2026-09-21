@@ -1,10 +1,12 @@
 import { Resend } from "resend";
 import WinnerTicketEmail from "@/emails/winner-ticket-email";
 import NonWinnerEmailTemplate from "@/emails/non-winner-email";
+import { waitForResultEmailSendSlot } from "@/lib/email-send-pace";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export interface EmailTicket {
+  recipientRecordId?: string;
   name: string;
   email: string;
   ticketNumber: number;
@@ -26,6 +28,7 @@ export interface EmailResult {
 }
 
 export interface NonWinnerEmail {
+  recipientRecordId?: string;
   registrantId: string;
   email: string;
   date: string;
@@ -36,11 +39,13 @@ export interface NonWinnerEmail {
 
 export async function sendNonWinnerEmail(recipient: NonWinnerEmail): Promise<EmailResult> {
   try {
+    await waitForResultEmailSendSlot();
     const { data, error } = await resend.emails.send({
       from: `${recipient.emailFromName} <${recipient.emailFromAddress}>`,
       to: [recipient.email],
       subject: `Your lottery result | ${recipient.orgName}`,
       react: NonWinnerEmailTemplate(recipient),
+      ...(recipient.recipientRecordId ? { tags: [{ name: "tf_recipient", value: recipient.recipientRecordId }] } : {}),
     }, { idempotencyKey: `non-winner:${recipient.registrantId}:${recipient.date}` });
     return error
       ? { success: false, email: recipient.email, error: error.message }
@@ -52,6 +57,7 @@ export async function sendNonWinnerEmail(recipient: NonWinnerEmail): Promise<Ema
 
 export async function sendWinnerEmail(ticket: EmailTicket): Promise<EmailResult> {
   try {
+    await waitForResultEmailSendSlot();
     const { data, error } = await resend.emails.send({
       from: `${ticket.emailFromName} <${ticket.emailFromAddress}>`,
       to: [ticket.email],
@@ -65,6 +71,7 @@ export async function sendWinnerEmail(ticket: EmailTicket): Promise<EmailResult>
         orgName: ticket.orgName,
         pickupLocation: ticket.pickupLocation,
       }),
+      ...(ticket.recipientRecordId ? { tags: [{ name: "tf_recipient", value: ticket.recipientRecordId }] } : {}),
     }, { idempotencyKey: `winner:${ticket.ticketId}` });
 
     if (error) {
@@ -82,17 +89,10 @@ export async function sendWinnerEmail(ticket: EmailTicket): Promise<EmailResult>
 
 export async function sendBulkWinnerEmails(tickets: EmailTicket[]): Promise<EmailResult[]> {
   console.log(`Sending emails to ${tickets.length} winners...`);
-
-  const results = await Promise.allSettled(tickets.map(sendWinnerEmail));
-
-  const emailResults: EmailResult[] = results.map((result, index) => {
-    if (result.status === "fulfilled") return result.value;
-    return {
-      success: false,
-      email: tickets[index].email,
-      error: result.reason?.message || "Promise rejected",
-    };
-  });
+  const emailResults: EmailResult[] = [];
+  for (const ticket of tickets) {
+    emailResults.push(await sendWinnerEmail(ticket));
+  }
 
   const successCount = emailResults.filter((r) => r.success).length;
   console.log(`Email sending complete: ${successCount}/${emailResults.length} successful`);

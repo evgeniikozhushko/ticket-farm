@@ -1,6 +1,6 @@
 import { inngest } from "@/inngest/client";
 import { dispatchWinnerEmailEvent } from "@/lib/email-dispatch-outbox";
-import { getEmailDispatchesCollection } from "@/lib/mongodb";
+import { getEmailDispatchesCollection, getResultEmailRecipientsCollection } from "@/lib/mongodb";
 
 const RECOVERY_BATCH_SIZE = 25;
 const STALE_AFTER_MS = 5 * 60 * 1000;
@@ -51,10 +51,43 @@ export const recoverWinnerEmailDispatchesFunction = inngest.createFunction(
       status: "failed",
       attempts: { $gte: MAX_ATTEMPTS },
     });
-    if (failed > 0 || exhausted > 0) {
-      throw new Error(`Winner email recovery: ${failed} dispatch failures; ${exhausted} exhausted dispatches.`);
+    const recipientsCollection = await getResultEmailRecipientsCollection();
+    const staleRecipients = await recipientsCollection.aggregate<{
+      _id: import("mongodb").ObjectId;
+      orgId: string;
+      date: string;
+    }>([
+      {
+        $match: {
+          status: { $in: ["pending", "failed", "sending"] },
+          updatedAt: { $lt: staleBefore },
+          attempts: { $lt: MAX_ATTEMPTS },
+        },
+      },
+      { $group: { _id: "$drawDispatchId", orgId: { $first: "$orgId" }, date: { $first: "$date" } } },
+      { $limit: RECOVERY_BATCH_SIZE },
+    ]).toArray();
+    for (const draw of staleRecipients) {
+      try {
+        await inngest.send({
+          id: `result-email-recovery:${draw._id}:${Math.floor(Date.now() / (15 * 60 * 1000))}`,
+          name: "lottery/draw.completed",
+          data: { orgId: draw.orgId, date: draw.date, dispatchId: draw._id.toString() },
+        });
+        dispatched++;
+      } catch (err) {
+        failed++;
+        console.error("[recoverWinnerEmailDispatches] Result email recovery failed:", err);
+      }
+    }
+    const exhaustedRecipients = await recipientsCollection.countDocuments({
+      status: { $in: ["failed", "sending"] },
+      attempts: { $gte: MAX_ATTEMPTS },
+    });
+    if (failed > 0 || exhausted > 0 || exhaustedRecipients > 0) {
+      throw new Error(`Winner email recovery: ${failed} dispatch failures; ${exhausted} exhausted dispatches; ${exhaustedRecipients} exhausted recipients.`);
     }
 
-    return { dispatched, failed, exhausted };
+    return { dispatched, failed, exhausted, exhaustedRecipients };
   }
 );

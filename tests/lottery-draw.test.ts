@@ -26,6 +26,10 @@ const dispatchesCollection = vi.hoisted(() => ({
   insertOne: vi.fn(),
   findOne: vi.fn(),
 }));
+const recipientsCollection = vi.hoisted(() => ({
+  insertMany: vi.fn(),
+  countDocuments: vi.fn(),
+}));
 
 vi.mock("@/lib/authz", () => ({
   requireRole: requireRoleMock,
@@ -54,6 +58,7 @@ vi.mock("@/lib/mongodb", () => ({
   getRegistrantsCollection: vi.fn(() => Promise.resolve(registrantsCollection)),
   getTicketsCollection: vi.fn(() => Promise.resolve(ticketsCollection)),
   getEmailDispatchesCollection: vi.fn(() => Promise.resolve(dispatchesCollection)),
+  getResultEmailRecipientsCollection: vi.fn(() => Promise.resolve(recipientsCollection)),
 }));
 
 async function loadAction() {
@@ -80,7 +85,13 @@ describe("drawTodayLottery", () => {
     ticketsCollection.insertMany.mockReset().mockResolvedValue({ insertedCount: 2 });
     ticketsCollection.find.mockReset();
     dispatchesCollection.insertOne.mockReset().mockResolvedValue({ insertedId: new ObjectId() });
-    dispatchesCollection.findOne.mockReset().mockResolvedValue(null);
+    dispatchesCollection.findOne.mockReset().mockResolvedValue({ payload: { tickets: [{
+      name: "Ada", email: "ada@example.com", ticketNumber: 1, ticketId: "TICKETADA001",
+      date: "2026-05-28", pickupTime: "6:15 PM", pickupLocation: "Current Pickup Desk",
+      orgName: "Ticket Farm", emailFromAddress: "hello@ticketfarm.ca", emailFromName: "Ticket Farm",
+    }], nonWinners: [] } });
+    recipientsCollection.insertMany.mockReset().mockResolvedValue({ insertedCount: 2 });
+    recipientsCollection.countDocuments.mockReset().mockResolvedValue(0);
   });
 
   it("rejects member draw and email-retry calls before database work", async () => {
@@ -176,19 +187,14 @@ describe("drawTodayLottery", () => {
     expect(dispatchesCollection.insertOne).toHaveBeenCalledOnce();
     expect(dispatchesCollection.insertOne).toHaveBeenCalledWith(
       expect.objectContaining({
-        payload: expect.objectContaining({
-          tickets: [
-            expect.objectContaining({
-              pickupTime: DEFAULT_PICKUP_TIME,
-              pickupLocation: undefined,
-            }),
-            expect.objectContaining({
-              pickupTime: DEFAULT_PICKUP_TIME,
-              pickupLocation: undefined,
-            }),
-          ],
-        }),
+        payload: { orgId: "org_1", date: "2026-05-28", dispatchId: expect.any(String) },
       }),
+      expect.any(Object)
+    );
+    expect(recipientsCollection.insertMany).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: "winner", ticket: expect.objectContaining({ pickupTime: DEFAULT_PICKUP_TIME }) }),
+      ]),
       expect.any(Object)
     );
     expect(dispatchWinnerEmailEventMock).toHaveBeenCalledOnce();
@@ -218,17 +224,13 @@ describe("drawTodayLottery", () => {
     expect(result.success).toBe(true);
     const ticketDocs = ticketsCollection.insertMany.mock.calls[0][0] as Omit<Ticket, "_id">[];
     expect(ticketDocs[0]).toEqual(expect.objectContaining({ pickupTime: "4:00-7:00 PM" }));
-    expect(dispatchesCollection.insertOne).toHaveBeenCalledWith(
-      expect.objectContaining({
-        payload: expect.objectContaining({
-          tickets: [
-            expect.objectContaining({
-              pickupTime: "4:00-7:00 PM",
-              pickupLocation: "Canmore Community Centre",
-            }),
-          ],
+    expect(recipientsCollection.insertMany).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({
+        ticket: expect.objectContaining({
+          pickupTime: "4:00-7:00 PM",
+          pickupLocation: "Canmore Community Centre",
         }),
-      }),
+      })]),
       expect.any(Object)
     );
   });
@@ -317,6 +319,51 @@ describe("drawTodayLottery", () => {
       queued: 0,
     });
     expect(dispatchesCollection.insertOne).not.toHaveBeenCalled();
+    expect(dispatchWinnerEmailEventMock).not.toHaveBeenCalled();
+  });
+
+  it("retries a historical draw from its committed recipient records", async () => {
+    const originalId = new ObjectId();
+    const retryId = new ObjectId();
+    dispatchesCollection.findOne.mockResolvedValue({
+      _id: originalId,
+      payload: { orgId: "org_1", date: "2026-05-27", dispatchId: originalId.toString() },
+    });
+    recipientsCollection.countDocuments.mockResolvedValue(2);
+    dispatchesCollection.insertOne.mockResolvedValue({ insertedId: retryId });
+    const { retryTodayWinnerEmails } = await loadAction();
+
+    await expect(retryTodayWinnerEmails("2026-05-27")).resolves.toEqual({ success: true, queued: 2 });
+    expect(recipientsCollection.countDocuments).toHaveBeenCalledWith({
+      drawDispatchId: originalId,
+      status: { $in: ["pending", "failed"] },
+      attempts: { $lt: 10 },
+    });
+    expect(dispatchesCollection.insertOne).toHaveBeenCalledWith(expect.objectContaining({
+      date: "2026-05-27",
+      payload: { orgId: "org_1", date: "2026-05-27", dispatchId: originalId.toString() },
+    }));
+    expect(dispatchWinnerEmailEventMock).toHaveBeenCalledWith({ dispatchId: retryId });
+  });
+
+  it("rejects a future retry date before reading draw records", async () => {
+    const { retryTodayWinnerEmails } = await loadAction();
+    await expect(retryTodayWinnerEmails("2026-05-29")).resolves.toMatchObject({ success: false });
+    expect(dispatchesCollection.findOne).not.toHaveBeenCalled();
+  });
+
+  it("surfaces ambiguous historical sends instead of silently reporting no work", async () => {
+    const originalId = new ObjectId();
+    dispatchesCollection.findOne.mockResolvedValue({
+      _id: originalId,
+      payload: { orgId: "org_1", date: "2026-05-27", dispatchId: originalId.toString() },
+    });
+    recipientsCollection.countDocuments.mockResolvedValueOnce(0).mockResolvedValueOnce(1);
+    const { retryTodayWinnerEmails } = await loadAction();
+    await expect(retryTodayWinnerEmails("2026-05-27")).resolves.toEqual({
+      success: false,
+      error: "1 result email needs provider reconciliation before retrying.",
+    });
     expect(dispatchWinnerEmailEventMock).not.toHaveBeenCalled();
   });
 

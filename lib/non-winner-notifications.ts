@@ -19,7 +19,8 @@ export async function sendNonWinnerNotifications(orgId: string, date: string, re
     await collection.updateOne(
       { ...filter, nonWinnerEmailSent: { $ne: true } },
       result.success
-        ? { $set: { nonWinnerEmailSent: true, nonWinnerEmailSentAt: new Date() }, $unset: { nonWinnerEmailError: "" } }
+        ? { $set: { nonWinnerEmailSent: true, nonWinnerEmailSentAt: new Date(),
+            ...(result.messageId ? { nonWinnerEmailMessageId: result.messageId } : {}) }, $unset: { nonWinnerEmailError: "" } }
         : { $set: { nonWinnerEmailSent: false, nonWinnerEmailError: result.error ?? "Email send failed." } },
     );
     if (result.success) counts.sent++;

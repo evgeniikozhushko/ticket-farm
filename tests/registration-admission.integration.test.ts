@@ -11,6 +11,7 @@ import {
 } from "vitest";
 import type {
   EmailDispatch,
+  ResultEmailRecipient,
   Lottery,
   Organization,
   Registrant,
@@ -52,6 +53,8 @@ vi.mock("@/lib/mongodb", () => ({
   getTicketsCollection: async () => db.collection<Ticket>("tickets"),
   getEmailDispatchesCollection: async () =>
     db.collection<EmailDispatch>("email_dispatches"),
+  getResultEmailRecipientsCollection: async () =>
+    db.collection<ResultEmailRecipient>("result_email_recipients"),
   getRegistrantsCollection: async () => {
     const collection = db.collection<Registrant>("registrants");
     return {
@@ -115,11 +118,9 @@ async function assertSnapshot(emails: string[]) {
     .collection<EmailDispatch>("email_dispatches")
     .findOne({ ...scope, dispatchKind: "draw" }))!;
   expect(outbox).not.toBeNull();
-  const recipients = [
-    ...outbox.payload.tickets.map((r) => r.email),
-    ...outbox.payload.nonWinners!.map((r) => r.email),
-  ];
-  expect(recipients.sort()).toEqual([...emails].sort());
+  const recipients = await db.collection<ResultEmailRecipient>("result_email_recipients")
+    .find({ drawDispatchId: outbox._id }).toArray();
+  expect(recipients.map((r) => r.ticket?.email ?? r.nonWinner?.email).sort()).toEqual([...emails].sort());
 }
 
 describe.skipIf(!uri)(
@@ -160,6 +161,7 @@ describe.skipIf(!uri)(
         "lotteries",
         "tickets",
         "email_dispatches",
+        "result_email_recipients",
         "public_registration_rate_limits",
         "organizations",
       ])

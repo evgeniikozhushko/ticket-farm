@@ -51,7 +51,7 @@ A multi-tenant SaaS lottery/ticket platform built on Next.js. Organizations run 
 2. **Duplicate registration prevention**: Unique index `{ orgId, email, date }` on registrants. Verified duplicate submissions return the ordinary success result without another quota claim; duplicate-key races require a confirming registrant read.
 3. **Atomic draw lock**: `updateOne({ status: { $ne: "LOTTERY_DRAWN" } })` prevents double-draws.
 4. **Idempotent Stripe webhooks**: Events stored in `processed_webhook_events`. Out-of-order protection via `{ statusUpdatedAt: { $lt: event.created } }` conditional filter.
-5. **Async email**: Draw emits `lottery/draw.completed` Inngest event. Emails sent outside HTTP lifecycle (no Vercel timeout risk). Tracks `emailSent`, `emailSentAt`, `emailError` per ticket.
+5. **Async email**: Draw atomically stores bounded recipient records and a small dispatch reference. Inngest processes five recipients per durable step; MongoDB reserves one shared Resend request per second. Ticket and registrant records retain API acceptance, provider message ID, and signed webhook delivery outcomes. Each step still obeys the hosting platform's invocation timeout.
 
 ### Subscription Plans
 

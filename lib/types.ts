@@ -42,6 +42,8 @@ export interface Registrant {
   nonWinnerEmailSent?: boolean;
   nonWinnerEmailSentAt?: Date;
   nonWinnerEmailError?: string;
+  nonWinnerEmailMessageId?: string;
+  nonWinnerEmailDelivery?: "delivered" | "bounced" | "failed";
 }
 
 // ---------------------------------------------------------------------------
@@ -83,6 +85,8 @@ export interface Ticket {
   emailSent?: boolean;
   emailSentAt?: Date;
   emailError?: string;
+  emailMessageId?: string;
+  emailDelivery?: "delivered" | "bounced" | "failed";
 }
 
 // ---------------------------------------------------------------------------
@@ -111,6 +115,7 @@ export type ParticipantHistoryEntry = {
   checkedInAt?: string;
   emailSent?: boolean;
   emailError?: string;
+  emailDelivery?: "delivered" | "bounced" | "failed";
 };
 
 // ---------------------------------------------------------------------------
@@ -132,7 +137,8 @@ export interface EmailDispatch {
   payload: {
     orgId: string;
     date: string;
-    tickets: import("@/lib/email").EmailTicket[];
+    dispatchId?: string;
+    tickets?: import("@/lib/email").EmailTicket[];
     nonWinners?: import("@/lib/email").NonWinnerEmail[];
   };
   status: "pending" | "dispatching" | "dispatched" | "failed";
@@ -140,6 +146,29 @@ export interface EmailDispatch {
   claimToken?: string;
   lastError?: string;
   dispatchedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ResultEmailRecipient {
+  _id?: ObjectId;
+  drawDispatchId: ObjectId;
+  orgId: string;
+  date: string;
+  kind: "winner" | "non_winner";
+  recipientId: string;
+  ticket?: import("@/lib/email").EmailTicket;
+  nonWinner?: import("@/lib/email").NonWinnerEmail;
+  status: "pending" | "sending" | "accepted" | "delivered" | "bounced" | "delivery_failed" | "failed" | "uncertain";
+  attempts: number;
+  claimToken?: string;
+  claimedAt?: Date;
+  firstAttemptAt?: Date;
+  messageId?: string;
+  lastError?: string;
+  acceptedAt?: Date;
+  deliveryAt?: Date;
+  deliveryRank?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -166,6 +195,7 @@ export interface WinnerInfo {
   ticketId?: string;
   emailSent?: boolean;
   emailError?: string;
+  emailDelivery?: "delivered" | "bounced" | "failed";
 }
 
 export interface LotteryStats {

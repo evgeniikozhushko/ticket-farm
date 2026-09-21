@@ -49,8 +49,8 @@ const store = vi.hoisted(() => {
       return rows[0];
     },
     collection: {
-      insertOne: vi.fn(async (doc: Omit<DispatchRow, "_id">) => {
-        const _id = new ObjectId();
+      insertOne: vi.fn(async (doc: Omit<DispatchRow, "_id"> & { _id?: ObjectId }) => {
+        const _id = doc._id ?? new ObjectId();
         rows.push({ ...doc, _id });
         return { acknowledged: true, insertedId: _id };
       }),
@@ -118,6 +118,7 @@ const registrantsCollection = vi.hoisted(() => ({
 const ticketsCollection = vi.hoisted(() => ({
   insertMany: vi.fn(),
 }));
+const recipientsCollection = vi.hoisted(() => ({ insertMany: vi.fn() }));
 
 vi.mock("@/lib/authz", () => ({
   requireRole: requireRoleMock,
@@ -138,6 +139,7 @@ vi.mock("@/lib/mongodb", () => ({
   getRegistrantsCollection: vi.fn(() => Promise.resolve(registrantsCollection)),
   getTicketsCollection: vi.fn(() => Promise.resolve(ticketsCollection)),
   getEmailDispatchesCollection: vi.fn(() => Promise.resolve(store.collection)),
+  getResultEmailRecipientsCollection: vi.fn(() => Promise.resolve(recipientsCollection)),
 }));
 
 vi.mock("@/inngest/client", () => ({
@@ -168,6 +170,7 @@ describe("winner email dispatch recovery path", () => {
     lotteriesCollection.updateOne.mockReset().mockResolvedValue({ matchedCount: 1 });
     registrantsCollection.find.mockReset();
     ticketsCollection.insertMany.mockReset().mockResolvedValue({ insertedCount: 2 });
+    recipientsCollection.insertMany.mockReset().mockResolvedValue({ insertedCount: 2 });
 
     consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
   });
@@ -214,6 +217,7 @@ describe("winner email dispatch recovery path", () => {
     expect(result.success).toBe(true);
     expect(ticketsCollection.insertMany).toHaveBeenCalledOnce();
     expect(store.collection.insertOne).toHaveBeenCalledOnce();
+    expect(recipientsCollection.insertMany).toHaveBeenCalledOnce();
     expect(inngestSendMock).toHaveBeenCalledTimes(1);
 
     const failed = store.only();
@@ -221,6 +225,7 @@ describe("winner email dispatch recovery path", () => {
     expect(failed.lastError).toBe("inngest down");
     expect(failed.attempts).toBe(1);
     expect(failed.eventName).toBe("lottery/draw.completed");
+    expect(failed.payload).toEqual({ orgId: "org_1", date: "2026-05-28", dispatchId: failed._id.toString() });
     // The cron filters on status in {pending, failed} and attempts < MAX_ATTEMPTS (10),
     // so the row is eligible for recovery.
     expect(["pending", "failed"]).toContain(failed.status);

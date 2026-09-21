@@ -35,7 +35,7 @@ These should be true before promoting a public beta build.
 - [ ] Confirm `pnpm setup-db` prints "Required deploy indexes verified."
 - [ ] In Atlas, confirm these required index groups exist:
       `registrants`, `tickets`, `lotteries`, `organizations`,
-      `processed_webhook_events`, `email_dispatches`, and
+      `processed_webhook_events`, `email_dispatches`, `result_email_recipients`, and
       `public_registration_rate_limits`.
 
 ## 2. Vercel production env vars
@@ -49,6 +49,7 @@ MONGODB_DB_NAME=<atlas prod db name>
 APP_URL=https://ticketfarm.ca
 
 RESEND_API_KEY=<resend prod key, sender hello@ticketfarm.ca>
+RESEND_WEBHOOK_SECRET=<signing secret for Resend result-email webhook>
 
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=<clerk prod publishable>
 CLERK_SECRET_KEY=<clerk prod secret>
@@ -123,11 +124,25 @@ Run against the Vercel preview URL.
       on the configured exact preview hostname. Never mix a test sitekey with a
       production secret.
 - [ ] Draw winners; Inngest enqueues `send-winner-emails`; Resend dispatches.
+- [ ] In Resend, check the team's rate limit under Settings → Usage. Result emails
+      reserve one shared send slot per second; confirm this is below the actual
+      team rate before the first draw. The locally configured Resend key returned
+      a 10 requests/second limit on 2026-09-20; confirm production uses that team.
+      The Inngest route allows 60 seconds per step. The beta target is all 100 recipients from
+      one draw accepted by Resend within 10 minutes of the worker starting when
+      Resend and MongoDB are healthy and there is no older email backlog.
+- [ ] Configure a Resend webhook at `https://ticketfarm.ca/api/webhooks/resend`
+      for `email.delivered`, `email.bounced`, and `email.failed`; set its
+      signing secret as `RESEND_WEBHOOK_SECRET`. Repeat with the preview URL and
+      preview secret before promotion. Send Resend's delivered and bounced test
+      addresses and confirm the ticket/registrant stores the provider message ID
+      and delivery outcome. `emailSent` means API acceptance, not inbox delivery.
 - [ ] In Inngest, confirm `recover-winner-email-dispatches` runs every 15 minutes
       and check its failed runs during the pilot. A failed run reports dispatch
       errors or rows that exhausted ten attempts. Inspect those rows in Atlas,
-      resolve the delivery issue, then use the dashboard retry for today's
-      unsent results. Historical retries remain separate work.
+      resolve the delivery issue, then use the dashboard retry for the draw date.
+      Recipients marked `uncertain` need provider reconciliation before any
+      manual resend because Resend's idempotency key lasts only 24 hours.
 - [ ] `/winners`, org settings, `/billing` (no checkout buttons visible, free
       tier shows "Available after beta." on paid cards), and `/platform`
       access (admin only) all render.

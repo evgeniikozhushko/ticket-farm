@@ -68,6 +68,7 @@ describe("lottery dashboard permissions", () => {
     expect(html).toContain("Reference");
     expect(html).toContain("Find ticket");
     expect(html.includes("Retry unsent result emails")).toBe(isAdmin);
+    expect(html.includes("Retry result emails for draw date")).toBe(isAdmin);
     expect(statsMock).toHaveBeenCalledOnce();
     expect(registrantsMock).toHaveBeenCalledOnce();
     expect(winnersMock).toHaveBeenCalledOnce();
@@ -88,6 +89,7 @@ describe("lottery dashboard permissions", () => {
 
     expect(html.includes("Run Lottery Draw")).toBe(isAdmin);
     expect(html.includes("Number of Winners")).toBe(isAdmin);
+    expect(html.includes("Retry result emails for draw date")).toBe(isAdmin);
     expect(html).toContain("Registrants: 1");
   });
 });

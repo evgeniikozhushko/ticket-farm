@@ -6,6 +6,7 @@ import type {
   Organization,
   ProcessedWebhookEvent,
   EmailDispatch,
+  ResultEmailRecipient,
   PublicRegistrationRateLimit,
 } from './types'
 
@@ -90,6 +91,11 @@ export async function getProcessedWebhookEventsCollection(): Promise<Collection<
 export async function getEmailDispatchesCollection(): Promise<Collection<EmailDispatch>> {
   const db = await getDb();
   return db.collection<EmailDispatch>("email_dispatches");
+}
+
+export async function getResultEmailRecipientsCollection(): Promise<Collection<ResultEmailRecipient>> {
+  const db = await getDb();
+  return db.collection<ResultEmailRecipient>("result_email_recipients");
 }
 
 export async function getPublicRegistrationRateLimitsCollection(): Promise<Collection<PublicRegistrationRateLimit>> {

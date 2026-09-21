@@ -101,6 +101,7 @@ export async function getTodayWinners(): Promise<WinnerInfo[]> {
           ticketId: ticket?.ticketId,
           emailSent: ticket?.emailSent,
           emailError: ticket?.emailError,
+          emailDelivery: ticket?.emailDelivery,
         };
       })
       .sort((a, b) => (a.ticketNumber || 0) - (b.ticketNumber || 0));
