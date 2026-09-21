@@ -9,6 +9,7 @@ type DispatchRow = {
   payload: unknown;
   status: "pending" | "dispatching" | "dispatched" | "failed";
   attempts: number;
+  claimToken?: string;
   lastError?: string;
   dispatchedAt?: Date;
   createdAt: Date;
@@ -26,8 +27,10 @@ const store = vi.hoisted(() => {
     if (!row) return false;
     if (filter._id && !row._id.equals(filter._id as ObjectId)) return false;
     if (filter.eventName !== undefined && row.eventName !== filter.eventName) return false;
-    const statusFilter = filter.status as { $in?: string[] } | undefined;
-    if (statusFilter?.$in && !statusFilter.$in.includes(row.status)) return false;
+    const statusFilter = filter.status as { $in?: string[] } | string | undefined;
+    if (typeof statusFilter === "string" && row.status !== statusFilter) return false;
+    if (typeof statusFilter === "object" && statusFilter?.$in && !statusFilter.$in.includes(row.status)) return false;
+    if (filter.claimToken !== undefined && row.claimToken !== filter.claimToken) return false;
     if (filter.orgId !== undefined && row.orgId !== filter.orgId) return false;
     if (filter.date !== undefined && row.date !== filter.date) return false;
     const updatedAtFilter = filter.updatedAt as { $lt?: Date } | undefined;
@@ -74,10 +77,10 @@ const store = vi.hoisted(() => {
       ),
       updateOne: vi.fn(
         async (
-          filter: { _id?: ObjectId },
+          filter: Record<string, unknown>,
           update: { $set?: Record<string, unknown>; $unset?: Record<string, unknown> },
         ) => {
-          const row = rows.find((candidate) => !filter._id || candidate._id.equals(filter._id));
+          const row = rows.find((candidate) => matches(candidate, filter));
           if (!row) return { matchedCount: 0 };
           if (update.$set) {
             for (const [k, v] of Object.entries(update.$set)) {
@@ -248,5 +251,56 @@ describe("winner email dispatch recovery path", () => {
     const idemKey = `winner-email-dispatch:${failed._id.toString()}`;
     expect(inngestSendMock.mock.calls[0][0]).toMatchObject({ id: idemKey });
     expect(inngestSendMock.mock.calls[1][0]).toMatchObject({ id: idemKey });
+  });
+
+  it("reclaims an interrupted claim and ignores the old worker's completion", async () => {
+    const inserted = await store.collection.insertOne({
+      orgId: "org_1",
+      date: "2026-05-28",
+      eventName: "lottery/draw.completed",
+      payload: { orgId: "org_1", date: "2026-05-28", tickets: [] },
+      status: "pending",
+      attempts: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    let releaseFirst!: () => void;
+    let firstSendStarted!: () => void;
+    const started = new Promise<void>((resolve) => { firstSendStarted = resolve; });
+    inngestSendMock
+      .mockImplementationOnce(() => new Promise<void>((resolve) => {
+        releaseFirst = resolve;
+        firstSendStarted();
+      }))
+      .mockResolvedValueOnce(undefined);
+    const { dispatchWinnerEmailEvent } = await import("@/lib/email-dispatch-outbox");
+
+    const first = dispatchWinnerEmailEvent({ dispatchId: inserted.insertedId });
+    await started;
+    const firstToken = store.only().claimToken;
+    expect(store.only().status).toBe("dispatching");
+
+    // A future cutoff simulates the passage of the five-minute lease.
+    expect(await dispatchWinnerEmailEvent({
+      dispatchId: inserted.insertedId,
+      staleBefore: new Date(Date.now() + 60_000),
+      maxAttempts: 10,
+    })).toBe(true);
+    expect(store.only().status).toBe("dispatched");
+    expect(store.only().attempts).toBe(2);
+
+    releaseFirst();
+    await first;
+    expect(store.only().status).toBe("dispatched");
+    expect(store.only().claimToken).toBeUndefined();
+    expect(firstToken).not.toBeUndefined();
+    expect(store.collection.updateOne).toHaveBeenLastCalledWith(
+      { _id: inserted.insertedId, status: "dispatching", claimToken: firstToken },
+      expect.any(Object),
+    );
+    expect(inngestSendMock.mock.calls.map(([event]) => event.id)).toEqual([
+      `winner-email-dispatch:${inserted.insertedId.toString()}`,
+      `winner-email-dispatch:${inserted.insertedId.toString()}`,
+    ]);
   });
 });

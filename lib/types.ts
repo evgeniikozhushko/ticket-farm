@@ -137,6 +137,7 @@ export interface EmailDispatch {
   };
   status: "pending" | "dispatching" | "dispatched" | "failed";
   attempts: number;
+  claimToken?: string;
   lastError?: string;
   dispatchedAt?: Date;
   createdAt: Date;

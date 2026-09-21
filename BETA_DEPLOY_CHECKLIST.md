@@ -123,6 +123,11 @@ Run against the Vercel preview URL.
       on the configured exact preview hostname. Never mix a test sitekey with a
       production secret.
 - [ ] Draw winners; Inngest enqueues `send-winner-emails`; Resend dispatches.
+- [ ] In Inngest, confirm `recover-winner-email-dispatches` runs every 15 minutes
+      and check its failed runs during the pilot. A failed run reports dispatch
+      errors or rows that exhausted ten attempts. Inspect those rows in Atlas,
+      resolve the delivery issue, then use the dashboard retry for today's
+      unsent results. Historical retries remain separate work.
 - [ ] `/winners`, org settings, `/billing` (no checkout buttons visible, free
       tier shows "Available after beta." on paid cards), and `/platform`
       access (admin only) all render.

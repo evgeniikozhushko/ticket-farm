@@ -353,3 +353,32 @@ Remaining work is all dashboard-driven and must be performed in Vercel/Atlas/Cle
 
 - The first full-suite attempt timed out because the disposable local MongoDB replica set was stopped. It passed after restarting that local server.
 - Real-key Turnstile preview smoke and winner-email recovery findings #8 and #9 remain follow-on work.
+
+# Recover interrupted winner email dispatches (finding #8)
+
+## Approved plan
+
+- [x] Inspect the outbox claim, recovery cron, indexes, tests, and deployment monitoring notes.
+- [x] Reclaim stale `dispatching` rows using the existing status/updated-time index and fence writes with a per-claim token.
+- [x] Continue recovery after a row-level dispatch error, surface exhausted rows in Inngest failed runs, and document the operator check.
+- [x] Add regression coverage for crash/reclaim, overlapping workers, failed-row isolation, and attempt exhaustion.
+- [x] Run targeted and full tests, lint, type check, build, diff check, and review the final changes.
+
+## Review
+
+### Changes
+
+- Recovery reclaims `dispatching` rows whose claim is over five minutes old, including legacy rows without a token; each claim gets a new token and stale workers cannot overwrite its result.
+- Recovery continues after individual send errors, moves stale ten-attempt claims to `failed`, and marks runs failed when rows error or exhaust attempts.
+- Added focused and real local MongoDB overlap tests, plus an Inngest dashboard check to the beta checklist. No new dependency or index is needed.
+
+### Verification
+
+- Targeted recovery tests passed, including the local MongoDB claim race.
+- Full local replica-set suite: 30 files, 208 tests passed.
+- `pnpm lint`, `pnpm exec tsc --noEmit --incremental false`, `pnpm build`, and `git diff --check` passed.
+
+### Limits
+
+- Operators must check Inngest runs during the pilot; an independent external heartbeat monitor was excluded by request. A completely stopped Inngest integration cannot report its own outage.
+- Bounded delivery and historical retry tooling remain finding #9.

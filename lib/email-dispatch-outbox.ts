@@ -1,8 +1,10 @@
 import { getEmailDispatchesCollection } from "@/lib/mongodb";
 import { inngest } from "@/inngest/client";
+import { randomUUID } from "node:crypto";
 import { ObjectId } from "mongodb";
 
 const DISPATCHABLE_STATUSES = ["pending", "failed"] as const;
+const RECOVERABLE_STATUSES = [...DISPATCHABLE_STATUSES, "dispatching"] as const;
 
 type DispatchWinnerEmailEventInput = {
   dispatchId?: ObjectId | string;
@@ -17,6 +19,7 @@ export async function dispatchWinnerEmailEvent(
 ): Promise<boolean> {
   const dispatchesCollection = await getEmailDispatchesCollection();
   const now = new Date();
+  const claimToken = randomUUID();
   const dispatchId =
     typeof input.dispatchId === "string" ? new ObjectId(input.dispatchId) : input.dispatchId;
 
@@ -24,7 +27,7 @@ export async function dispatchWinnerEmailEvent(
     {
       ...(dispatchId ? { _id: dispatchId } : {}),
       eventName: "lottery/draw.completed",
-      status: { $in: DISPATCHABLE_STATUSES },
+      status: { $in: input.staleBefore ? RECOVERABLE_STATUSES : DISPATCHABLE_STATUSES },
       ...(input.orgId ? { orgId: input.orgId } : {}),
       ...(input.date ? { date: input.date } : {}),
       ...(input.staleBefore ? { updatedAt: { $lt: input.staleBefore } } : {}),
@@ -33,6 +36,7 @@ export async function dispatchWinnerEmailEvent(
     {
       $set: {
         status: "dispatching",
+        claimToken,
         updatedAt: now,
       },
       $inc: { attempts: 1 },
@@ -53,27 +57,28 @@ export async function dispatchWinnerEmailEvent(
     });
 
     await dispatchesCollection.updateOne(
-      { _id: dispatch._id },
+      { _id: dispatch._id, status: "dispatching", claimToken },
       {
         $set: {
           status: "dispatched",
           dispatchedAt: new Date(),
           updatedAt: new Date(),
         },
-        $unset: { lastError: "" },
+        $unset: { lastError: "", claimToken: "" },
       }
     );
 
     return true;
   } catch (err) {
     await dispatchesCollection.updateOne(
-      { _id: dispatch._id },
+      { _id: dispatch._id, status: "dispatching", claimToken },
       {
         $set: {
           status: "failed",
           lastError: err instanceof Error ? err.message : String(err),
           updatedAt: new Date(),
         },
+        $unset: { claimToken: "" },
       }
     );
     throw err;
