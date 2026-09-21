@@ -81,8 +81,10 @@ export const recoverWinnerEmailDispatchesFunction = inngest.createFunction(
       }
     }
     const exhaustedRecipients = await recipientsCollection.countDocuments({
-      status: { $in: ["failed", "sending"] },
-      attempts: { $gte: MAX_ATTEMPTS },
+      $or: [
+        { status: "uncertain" },
+        { status: { $in: ["failed", "sending"] }, attempts: { $gte: MAX_ATTEMPTS } },
+      ],
     });
     if (failed > 0 || exhausted > 0 || exhaustedRecipients > 0) {
       throw new Error(`Winner email recovery: ${failed} dispatch failures; ${exhausted} exhausted dispatches; ${exhaustedRecipients} exhausted recipients.`);

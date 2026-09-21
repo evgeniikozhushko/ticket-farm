@@ -17,11 +17,19 @@ async function syncRecipient(record: ResultEmailRecipient) {
   if (record.status !== "accepted" && record.status !== "delivered" &&
       record.status !== "bounced" && record.status !== "delivery_failed" && record.status !== "failed") return;
   const success = record.status !== "failed";
+  const delivery: "delivered" | "bounced" | "failed" | undefined = record.status === "delivered"
+    ? "delivered"
+    : record.status === "bounced"
+      ? "bounced"
+      : record.status === "delivery_failed"
+        ? "failed"
+        : undefined;
   const set = success
     ? {
         emailSent: true,
         emailSentAt: record.acceptedAt ?? new Date(),
         ...(record.messageId ? { emailMessageId: record.messageId } : {}),
+        ...(delivery ? { emailDelivery: delivery } : {}),
       }
     : { emailSent: false, emailError: record.lastError ?? "Email send failed." };
   if (record.kind === "winner") {
@@ -38,6 +46,7 @@ async function syncRecipient(record: ResultEmailRecipient) {
           nonWinnerEmailSent: true,
           nonWinnerEmailSentAt: record.acceptedAt ?? new Date(),
           ...(record.messageId ? { nonWinnerEmailMessageId: record.messageId } : {}),
+          ...(delivery ? { nonWinnerEmailDelivery: delivery } : {}),
         }
       : { nonWinnerEmailSent: false, nonWinnerEmailError: record.lastError ?? "Email send failed." };
     await registrants.updateOne(

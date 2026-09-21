@@ -385,17 +385,39 @@ Remaining work is all dashboard-driven and must be performed in Vercel/Atlas/Cle
 
 # Reliable result-email delivery (finding #9)
 
-## Proposed plan
+## Approved plan
 
-- [ ] Confirm the current Resend team rate and deployment limits; set a conservative shared send pace and document the supported draw size and delivery target for beta.
-- [ ] Replace new draw and retry outbox payloads with a small dispatch reference. Persist the exact winner and non-winner recipient snapshot in bounded records within the draw transaction, and continue accepting already-queued legacy payloads.
-- [ ] Send bounded, paced recipient batches with durable Inngest checkpoints. Coordinate original and manual runs per recipient, retain stable provider idempotency keys, and prevent late failures from erasing a successful state.
-- [ ] Save Resend message IDs and handle signed delivery/bounce/failure webhooks with idempotent, ordered updates; document the required webhook secret and endpoint setup.
-- [ ] Add an admin-only historical-date retry path that uses the committed draw snapshot and cannot select later or unrelated registrations.
-- [ ] Test provider 429/timeout, database failure, overlapping retries, batch boundaries, legacy events, webhook replay/order, and historical retry. Run targeted and full tests, lint, type check, build, and diff check; review the final changes.
+- [x] Confirm the current Resend team rate and deployment limits; set a conservative shared send pace and document the supported draw size and delivery target for beta.
+- [x] Replace new draw and retry outbox payloads with a small dispatch reference. Persist the exact winner and non-winner recipient snapshot in bounded records within the draw transaction, and continue accepting already-queued legacy payloads.
+- [x] Send bounded, paced recipient batches with durable Inngest checkpoints. Coordinate original and manual runs per recipient, retain stable provider idempotency keys, and prevent late failures from erasing a successful state.
+- [x] Save Resend message IDs and handle signed delivery/bounce/failure webhooks with idempotent, ordered updates; document the required webhook secret and endpoint setup.
+- [x] Add an admin-only historical-date retry path that uses the committed draw snapshot and cannot select later or unrelated registrations.
+- [x] Test provider 429/timeout, database failure, overlapping retries, batch boundaries, legacy events, webhook replay/order, and historical retry. Run targeted and full tests, lint, type check, build, and diff check; review the final changes.
 
 ## Scope notes
 
 - Resend's documented default is 10 requests/second per team, but the account's actual limit must be checked before claiming a delivery deadline. Its idempotency keys expire after 24 hours, so ambiguous sends older than that must be surfaced for operator reconciliation instead of blindly resent.
 - The new dispatch format must coexist with rows and Inngest events created before deployment; no production data migration is assumed.
 - Webhook delivery tracking reports provider outcomes, not guaranteed inbox receipt.
+
+## Review — reliable result-email delivery
+
+### Changes
+
+- Each completed draw now stores a compact dispatch reference and a durable, committed recipient snapshot. Workers process five recipients per checkpoint with a shared one-email-per-second pace, leases, retry limits, and Resend idempotency keys.
+- Retry work uses the original committed snapshot, including historical draws; legacy queued events remain supported. Records whose outcome is still unknown after Resend's idempotency window are marked for operator reconciliation and make the recovery job fail visibly.
+- Result email message IDs and ordered delivery outcomes are recorded from verified Resend webhooks. Webhook replays repair a failed dashboard-status write, and a later bounce or failure cannot be replaced by an older delivery event.
+- Dashboard admins can retry a selected historical draw. The checklist documents the `RESEND_WEBHOOK_SECRET`, webhook endpoint, Atlas indexes, 60-second function duration, and the 100-recipient/10-minute beta target.
+
+### Verification
+
+- Read-only Resend API check using the configured local key reported a 10 requests/second account limit; application pacing remains deliberately capped at one request per second.
+- Focused webhook, Inngest, recovery, and real local MongoDB recipient tests — 23 tests passed.
+- `TICKET_FARM_TEST_MONGODB_URI='mongodb://127.0.0.1:27187/?replicaSet=ticketfarmtest' pnpm test` — 32 files, 230 tests passed.
+- `pnpm lint`, `pnpm exec tsc --noEmit --incremental false`, and `pnpm build` — passed. The build includes `ƒ /api/webhooks/resend`.
+- `git diff --check` — passed; final diff reviewed.
+
+### Limits
+
+- Production setup remains required: run the index setup, configure Resend to send signed events to `/api/webhooks/resend`, and set `RESEND_WEBHOOK_SECRET` in the deployment environment.
+- Delivery status reflects Resend's provider events. It does not establish that an email was read or reached the recipient's inbox.

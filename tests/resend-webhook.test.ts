@@ -122,7 +122,7 @@ it("replays a verified event to repair a failed ticket status write", async () =
     data: { email_id: "msg_1", tags: { tf_recipient: recipientId.toString() } },
   });
   const delivered = { ...winner, status: "delivered", messageId: "msg_1" };
-  recipients.findOne.mockResolvedValueOnce(winner).mockResolvedValue(delivered);
+  recipients.findOne.mockResolvedValueOnce(winner).mockResolvedValueOnce(delivered).mockResolvedValue(delivered);
   recipients.findOneAndUpdate.mockResolvedValueOnce(delivered).mockResolvedValue(null);
   tickets.updateOne.mockRejectedValueOnce(new Error("MongoDB unavailable")).mockResolvedValue({ modifiedCount: 1 });
   const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
