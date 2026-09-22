@@ -1,6 +1,6 @@
 # Ticket Farm
 
-**Multi-tenant SaaS lottery & ticket management platform** — Organizations run daily lotteries where users register for free, winners are drawn automatically, and tickets are emailed with pickup details.
+**Multi-tenant SaaS lottery & ticket management platform** —Organizations run daily lotteries where the public registers for free, administrators manually run randomized draws, and winners receive email tickets with pickup details.
 
 🔗 **Live Demo:** [ticket-farm.vercel.app](https://ticket-farm.vercel.app)
 
@@ -9,8 +9,8 @@
 ## 🎯 What It Does
 
 - Organizations create a branded public registration page (e.g., `/my-org`)
-- Daily lottery draws: register today → win tickets for tomorrow
-- Winners receive email tickets with QR codes/pickup details
+- Daily lotteries: collect registrations, run a randomized draw, and notify winners
+- Winners receive email tickets with pickup details
 - Admin dashboard to view registrants, run draws, manage settings
 - Subscription plans with tiered daily registration limits
 

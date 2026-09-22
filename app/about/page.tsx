@@ -15,10 +15,7 @@ export default function AboutPage() {
           Ticket Farm
         </h1>
         <p className="text-lg text-muted-foreground">
-          Ticket Farm is a multi-tenant platform for organizations that run daily
-          lotteries. Public visitors register on a branded org page; the platform
-          picks winners on a schedule, emails their tickets, and tracks pickup —
-          all from one dashboard.
+        Ticket Farm helps community organizations collect registrations, run fair randomized draws, email tickets to winners, and confirm pickup using private References—all from one dashboard.
         </p>
         <p className="text-base text-muted-foreground">
           We&apos;re currently in private beta. Organization signup is open and free
