@@ -28,9 +28,22 @@
 
 - The disposable localhost replica set timed out during connection setup even after attempting to start its existing server process. The real-database summaries/backfill checks remain pending; no production database was accessed.
 
-## Follow-up — part B: platform directory batching
+## Platform directory batching (finding #15, part B)
 
-- Replace `listOrgDirectory`'s unpaginated 1 + 5N fan-out with a cursor-paginated, set-based query. Account for each organization's local date when calculating today's registrations, add the supporting organization cursor index to the required-index verifier, update the platform page with pagination controls, and cover the new query shape separately.
+### Plan
+
+- [x] Inspect the directory action, page, mocks, supporting indexes, and the timezone-specific daily-count constraint.
+- [x] Add and verify a `{ createdAt: -1, _id: -1 }` organization cursor index; page organizations at 50 records with a stable opaque cursor.
+- [x] Replace the five-per-organization fan-out with set-based aggregations scoped to the current page: total registrants, total tickets, last activity, and daily counts bucketed by each organization's local date.
+- [x] Preserve the existing row fields, add a directory result cursor, and add a Next-page control to the platform page.
+- [x] Update directory unit tests for authorization, bounded organization reads, timezone buckets, and aggregation-based metrics.
+- [x] Run targeted tests, lint, type check, production build, and diff checks; local replica-set verification remains separately blocked.
+
+### Review
+
+- Replaced the unbounded organization read and 1 + 5N fan-out with a 50-row `{ createdAt, _id }` cursor page plus one registrant and one ticket aggregation for that page.
+- Daily registrant metrics retain each organization’s own local date; the platform page exposes a Next control without changing row fields.
+- `pnpm test tests/platform-orgs.test.ts`, `pnpm lint`, `pnpm exec tsc --noEmit --incremental false`, `pnpm build`, and `git diff --check` passed.
 
 # Self-healing MongoDB connection cache (finding #14)
 

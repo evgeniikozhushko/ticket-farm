@@ -133,6 +133,12 @@ export async function setupIndexes() {
   );
   console.log("  organizations: { slug } unique");
 
+  await db.collection('organizations').createIndex(
+    { createdAt: -1, _id: -1 },
+    { name: 'createdAt_id_directory_idx', background: true }
+  );
+  console.log("  organizations: { createdAt, _id } directory cursor");
+
   // ============================================================
   // PROCESSED_WEBHOOK_EVENTS — Stripe idempotency
   // ============================================================
@@ -304,6 +310,11 @@ const REQUIRED_DEPLOY_INDEXES: RequiredIndex[] = [
     name: 'orgId_email_unique_idx',
     key: { orgId: 1, email: 1 },
     unique: true,
+  },
+  {
+    collection: 'organizations',
+    name: 'createdAt_id_directory_idx',
+    key: { createdAt: -1, _id: -1 },
   },
   {
     collection: 'participant_summaries',

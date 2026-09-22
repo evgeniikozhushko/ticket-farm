@@ -16,6 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { listOrgDirectory } from "@/lib/actions/platform.actions";
+import { Button } from "@/components/ui/button";
 
 function formatDate(date?: Date): string {
   if (!date) return "Never";
@@ -25,8 +26,9 @@ function formatDate(date?: Date): string {
   }).format(date);
 }
 
-export default async function PlatformOrgsPage() {
-  const orgs = await listOrgDirectory();
+export default async function PlatformOrgsPage({ searchParams }: { searchParams: Promise<{ cursor?: string }> }) {
+  const { cursor } = await searchParams;
+  const { orgs, nextCursor } = await listOrgDirectory(cursor);
 
   return (
     <main className="min-h-svh bg-background p-4 md:p-8">
@@ -189,6 +191,13 @@ export default async function PlatformOrgsPage() {
             </div>
           </CardContent>
         </Card>
+        {nextCursor && (
+          <div className="flex justify-end">
+            <Button asChild variant="outline">
+              <Link href={{ pathname: "/platform/orgs", query: { cursor: nextCursor } }}>Next</Link>
+            </Button>
+          </div>
+        )}
       </div>
     </main>
   );
