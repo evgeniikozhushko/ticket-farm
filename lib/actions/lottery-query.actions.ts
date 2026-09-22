@@ -36,6 +36,7 @@ export async function getTodayLotteryStats(): Promise<LotteryStats> {
       winnersDrawn: 0,
       lotteryDate: getTodayDateString(),
       maxTicketsAvailable: 0,
+      unavailable: true,
     };
   }
 }

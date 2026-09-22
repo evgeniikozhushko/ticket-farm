@@ -1,3 +1,23 @@
+# Operational integrity controls (finding #16)
+
+## Plan
+
+- [x] Inspect the audit finding, index setup/verifier, lottery query callers, and existing test coverage; retain finding #15's replica-set verification as an explicit release-blocking reminder.
+- [x] Expand the read-only required-index verifier to cover all foundational unique invariants created by `setupIndexes`.
+- [x] Keep the winner lookup tenant-scoped and return explicit unavailable results from lottery dashboard queries instead of fabricated empty/open data; update the dashboard to render that state safely.
+- [x] Add focused unavailable-state coverage; the winner lookup was already tenant-scoped in the current revision.
+- [ ] Run the broader suite and production build; targeted tests, lint, type checking, and diff checks passed.
+
+## Interim review
+
+- Required-index verification now covers registrant, lottery, ticket, and organization uniqueness invariants alongside the existing operational indexes.
+- A failed dashboard stats query now carries an explicit unavailable marker and renders a retry-safe staff message instead of healthy-looking empty data.
+- `pnpm test tests/dashboard-permissions.test.tsx`, `pnpm lint`, `pnpm exec tsc --noEmit --incremental false`, and `git diff --check` passed.
+
+## Deferred follow-up
+
+- Repository CI and an application audit trail are separate delivery/retention design tasks. They require decisions on provider, audit-event schema, retention, and actor-data policy, so they are not bundled into this corrective pass.
+
 # Indexed participant summaries and bounded history (finding #15, part A)
 
 ## Plan
@@ -27,6 +47,7 @@
 ### Remaining verification
 
 - The disposable localhost replica set timed out during connection setup even after attempting to start its existing server process. The real-database summaries/backfill checks remain pending; no production database was accessed.
+- **Before declaring the production-readiness plan complete:** repair the local replica set, add the pending summary/backfill integration coverage, and rerun the full local replica-set suite for finding #15.
 
 ## Platform directory batching (finding #15, part B)
 

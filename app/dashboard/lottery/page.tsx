@@ -34,6 +34,16 @@ export default async function LotteryAdminPage() {
     drawnAt: stats.drawnAt?.toISOString(),
   };
 
+  if (serializedStats.unavailable) {
+    return (
+      <DashboardShell title="Lottery">
+        <div className="p-6 text-sm text-muted-foreground">
+          Lottery data is temporarily unavailable. Please try again shortly.
+        </div>
+      </DashboardShell>
+    );
+  }
+
   const serializedRegistrants: SerializedRegistrant[] = registrants.map((r) => ({
     orgId: r.orgId,
     name: r.name,

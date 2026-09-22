@@ -209,6 +209,7 @@ export interface LotteryStats {
   lotteryDate: string;
   drawnAt?: Date;
   maxTicketsAvailable: number;
+  unavailable?: true;
 }
 
 export type SerializedOrganization = Omit<

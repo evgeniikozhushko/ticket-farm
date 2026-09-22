@@ -280,6 +280,36 @@ type RequiredIndex = {
 
 const REQUIRED_DEPLOY_INDEXES: RequiredIndex[] = [
   {
+    collection: 'registrants',
+    name: 'orgId_email_date_unique_idx',
+    key: { orgId: 1, email: 1, date: 1 },
+    unique: true,
+  },
+  {
+    collection: 'lotteries',
+    name: 'orgId_date_unique_idx',
+    key: { orgId: 1, date: 1 },
+    unique: true,
+  },
+  {
+    collection: 'tickets',
+    name: 'ticketId_unique_idx',
+    key: { ticketId: 1 },
+    unique: true,
+  },
+  {
+    collection: 'organizations',
+    name: 'clerkOrgId_unique_idx',
+    key: { clerkOrgId: 1 },
+    unique: true,
+  },
+  {
+    collection: 'organizations',
+    name: 'slug_unique_idx',
+    key: { slug: 1 },
+    unique: true,
+  },
+  {
     collection: 'result_email_recipients',
     name: 'org_date_kind_recipient_unique_idx',
     key: { orgId: 1, date: 1, kind: 1, recipientId: 1 },

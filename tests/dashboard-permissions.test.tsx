@@ -92,4 +92,11 @@ describe("lottery dashboard permissions", () => {
     expect(html.includes("Retry result emails for draw date")).toBe(isAdmin);
     expect(html).toContain("Registrants: 1");
   });
+
+  it("shows an unavailable state instead of empty lottery data", async () => {
+    authMock.mockResolvedValue({ userId: "user_1", orgId: "org_1", orgRole: "org:admin" });
+    statsMock.mockResolvedValue({ totalRegistrants: 0, status: "OPEN", winnersDrawn: 0, lotteryDate: "2026-09-20", maxTicketsAvailable: 0, unavailable: true });
+    const { default: LotteryPage } = await import("@/app/dashboard/lottery/page");
+    expect(renderToStaticMarkup(await LotteryPage())).toContain("Lottery data is temporarily unavailable");
+  });
 });
