@@ -41,17 +41,17 @@ export async function getTodayLotteryStats(): Promise<LotteryStats> {
   }
 }
 
-export async function getTodayRegistrants(): Promise<Registrant[]> {
+export async function getTodayRegistrants(): Promise<Registrant[] | null> {
   try {
     const { orgId } = await requireRole("org:member");
     const org = await getOrganization(orgId);
     const date = getTodayDateString(org?.timezone);
     const collection = await getRegistrantsCollection();
 
-    return collection.find({ orgId, date }).sort({ enteredAt: 1 }).limit(250).toArray();
+    return await collection.find({ orgId, date }).sort({ enteredAt: 1 }).limit(250).toArray();
   } catch (err) {
     console.error("getTodayRegistrants error:", err);
-    return [];
+    return null;
   }
 }
 
@@ -69,7 +69,7 @@ export async function getTodayLottery(): Promise<Lottery | null> {
   }
 }
 
-export async function getTodayWinners(): Promise<WinnerInfo[]> {
+export async function getTodayWinners(): Promise<WinnerInfo[] | null> {
   try {
     const { orgId } = await requireRole("org:member");
     const org = await getOrganization(orgId);
@@ -108,6 +108,6 @@ export async function getTodayWinners(): Promise<WinnerInfo[]> {
       .sort((a, b) => (a.ticketNumber || 0) - (b.ticketNumber || 0));
   } catch (err) {
     console.error("getTodayWinners error:", err);
-    return [];
+    return null;
   }
 }

@@ -99,4 +99,26 @@ describe("lottery dashboard permissions", () => {
     const { default: LotteryPage } = await import("@/app/dashboard/lottery/page");
     expect(renderToStaticMarkup(await LotteryPage())).toContain("Lottery data is temporarily unavailable");
   });
+
+  it.each(["registrants", "winners"])("shows unavailable when only the %s query fails", async (query) => {
+    authMock.mockResolvedValue({ userId: "user_1", orgId: "org_1", orgRole: "org:admin" });
+    (query === "registrants" ? registrantsMock : winnersMock).mockResolvedValue(null);
+    const { default: LotteryPage } = await import("@/app/dashboard/lottery/page");
+    const html = renderToStaticMarkup(await LotteryPage());
+    expect(html).toContain("Lottery data is temporarily unavailable");
+    expect(html).not.toContain("Registrants: 1");
+    expect(html).not.toContain("Retry unsent result emails");
+    expect(html).not.toContain("Ticket pickup");
+  });
+
+  it("renders successful empty queries as an empty lottery", async () => {
+    authMock.mockResolvedValue({ userId: "user_1", orgId: "org_1", orgRole: "org:admin" });
+    statsMock.mockResolvedValue({ totalRegistrants: 0, status: "OPEN", winnersDrawn: 0, lotteryDate: "2026-09-20", maxTicketsAvailable: 0 });
+    registrantsMock.mockResolvedValue([]);
+    winnersMock.mockResolvedValue([]);
+    const { default: LotteryPage } = await import("@/app/dashboard/lottery/page");
+    const html = renderToStaticMarkup(await LotteryPage());
+    expect(html).toContain("Registrants: 0");
+    expect(html).not.toContain("Lottery data is temporarily unavailable");
+  });
 });

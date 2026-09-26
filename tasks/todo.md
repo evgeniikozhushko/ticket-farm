@@ -1,3 +1,21 @@
+# Fix merge-review findings
+
+## Plan
+
+- [x] Inspect both findings, callers, and existing tests; user approved the proposed fixes.
+- [x] Preserve the email prefix when applying a participant pagination cursor.
+- [x] Distinguish failed registrant/winner queries from successful empty results and render the dashboard unavailable state.
+- [x] Add regression coverage, run the full replica-set suite and static/build gates, and review the final diff.
+
+## Review
+
+- Combined the email prefix and cursor predicates so subsequent search pages stay within the requested prefix.
+- Registrant and winner query failures now return `null`, distinct from successful empty arrays. The dashboard displays its unavailable state when either query fails; registrant cursor execution is awaited so asynchronous failures reach the handler.
+- Added nine regression cases covering filtered pagination, database failures, partial dashboard failures, and successful empty results.
+- Targeted tests: 3 files / 17 tests passed. Full localhost replica-set suite: 35 files / 246 tests passed with no skips.
+- `pnpm lint`, `pnpm exec tsc --noEmit --incremental false`, `pnpm build`, and `git diff --check` passed; final diff reviewed.
+- Both merge-review findings are resolved. Changes are uncommitted; no merge or deployment performed.
+
 # Complete `fix/prod-ready` verification
 
 ## Plan

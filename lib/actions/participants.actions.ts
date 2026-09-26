@@ -43,7 +43,10 @@ export async function listOrgParticipants(opts: ListOrgParticipantsOptions): Pro
     return { participants, ...(rows.length > limit && last ? { nextCursor: encodeNameCursor(last.normalizedName, last.email) } : {}) };
   }
   const cursor = opts.cursor?.trim().toLowerCase();
-  const rows = await collection.find({ orgId, ...(search ? { email: { $regex: `^${escapeRegExp(search)}` } } : {}), ...(cursor ? { email: { $gt: cursor } } : {}) })
+  const rows = await collection.find({ orgId, ...(search || cursor ? { email: {
+    ...(search ? { $regex: `^${escapeRegExp(search)}` } : {}),
+    ...(cursor ? { $gt: cursor } : {}),
+  } } : {}) })
     .sort({ email: 1 }).limit(limit + 1).toArray();
   const participants = rows.slice(0, limit).map((row) => {
     const participant = { ...row };

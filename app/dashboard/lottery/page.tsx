@@ -34,7 +34,7 @@ export default async function LotteryAdminPage() {
     drawnAt: stats.drawnAt?.toISOString(),
   };
 
-  if (serializedStats.unavailable) {
+  if (serializedStats.unavailable || registrants === null || winners === null) {
     return (
       <DashboardShell title="Lottery">
         <div className="p-6 text-sm text-muted-foreground">

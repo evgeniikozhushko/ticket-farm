@@ -31,6 +31,15 @@ describe("participant actions", () => {
     await listOrgParticipants({ search: "Ada", limit: 10 });
     expect(summaries.find).toHaveBeenCalledWith({ orgId: "org_1", normalizedName: { $regex: "^ada" } });
   });
+  it("retains the email prefix on subsequent search pages", async () => {
+    summaries.find.mockReturnValue(cursor([]));
+    const { listOrgParticipants } = await load();
+    await listOrgParticipants({ search: " ADA@EXAMPLE. ", cursor: "ada@example.com", limit: 10 });
+    expect(summaries.find).toHaveBeenCalledWith({
+      orgId: "org_1",
+      email: { $regex: "^ada@example\\.", $gt: "ada@example.com" },
+    });
+  });
   it("bounds participant history and only loads tickets for its page", async () => {
     const enteredAt = new Date();
     registrants.find.mockReturnValue(cursor([{ orgId: "org_1", email: "ada@example.com", date: "2026-09-20", enteredAt, name: "Ada" }]));
