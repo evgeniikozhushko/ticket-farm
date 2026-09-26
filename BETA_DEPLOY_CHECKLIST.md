@@ -1,7 +1,8 @@
 # Private Beta Deploy Checklist
 
-A short, action-only checklist for promoting the `production-beta` branch to
-`ticketfarm.ca`. The full plan lives in `tasks/todo.md`; this file is just the
+A short, action-only checklist for releasing a reviewed commit from `main` to
+`ticketfarm.ca`. Prepare the preview on `chore/beta-launch-readiness` (or its
+successor launch branch). The full plan lives in `tasks/todo.md`; this file is just the
 dashboard/CLI steps and final launch gates that can't be automated from the code.
 
 ## 0. Code readiness gates
@@ -13,8 +14,8 @@ These should be true before promoting a public beta build.
 - [ ] Run `pnpm lint`.
 - [ ] Run `pnpm exec tsc --noEmit`.
 - [ ] Run `pnpm test`.
-- [ ] Confirm the participant history page still uses database aggregation and
-      pagination, not full org-wide in-memory scans.
+- [ ] Confirm the participant directory reads indexed summaries and selected
+      participant history uses bounded pagination.
 - [ ] Confirm checkout remains server-side plan based: clients send `planName`,
       the server resolves Stripe price IDs, and redirects use `APP_URL`, not
       request `Origin`.
@@ -34,7 +35,7 @@ These should be true before promoting a public beta build.
       run `pnpm setup-db` once to create indexes.
 - [ ] Confirm `pnpm setup-db` prints "Required deploy indexes verified."
 - [ ] In Atlas, confirm these required index groups exist:
-      `registrants`, `tickets`, `lotteries`, `organizations`,
+      `registrants`, `participant_summaries`, `tickets`, `lotteries`, `organizations`,
       `processed_webhook_events`, `email_dispatches`, `result_email_recipients`, and
       `public_registration_rate_limits`.
 - [ ] Each warm Vercel instance uses a fixed MongoDB pool of at most 10 connections
@@ -104,7 +105,18 @@ creation stays owned by the in-app onboarding flow.
 
 ## 4. Deploy to Vercel preview first
 
-- [ ] Push `production-beta` (already done if you're reading this on GitHub).
+- [ ] Identify the Vercel project and inspect its configured Production Branch
+      and automatic deployment settings before pushing or merging release work.
+- [ ] Configure the Preview environment with its own database and provider
+      settings; verify the preview database name and create/verify its required
+      indexes using the existing setup script. Use the maintenance backfill
+      sequence in §1 if this database already contains registrations.
+- [ ] Set preview `APP_URL` to the exact HTTPS preview origin and configure Clerk
+      for that origin. Configure preview Inngest event/signing keys and the
+      Resend webhook secret for the preview endpoint. Keep Stripe in test mode
+      and the paid price-ID variables unset.
+- [ ] Push the reviewed launch branch to create a Preview deployment; record the
+      deployment URL and source commit in `tasks/todo.md`.
 - [ ] Confirm Vercel builds the preview cleanly.
 - [ ] Set paired Turnstile site and secret keys for preview. Include its exact hostname
       in `TURNSTILE_ALLOWED_HOSTNAMES` and the Cloudflare widget's hostname settings.
@@ -112,7 +124,8 @@ creation stays owned by the in-app onboarding flow.
 - [ ] Run the manual smoke (§5) against the preview URL.
 - [ ] Check Vercel function logs during smoke; there should be no unhandled
       errors from MongoDB, Clerk, Stripe, Resend, or Inngest.
-- [ ] Promote the preview to production after the smoke passes.
+- [ ] Complete the production configuration checks in §1–3 and the promotion
+      steps in §7 after preview smoke passes.
 
 ## 5. Manual smoke test
 
@@ -152,11 +165,22 @@ Run against the Vercel preview URL.
       resolve the delivery issue, then use the dashboard retry for the draw date.
       Recipients marked `uncertain` need provider reconciliation before any
       manual resend because Resend's idempotency key lasts only 24 hours.
-- [ ] `/winners`, org settings, `/billing` (no checkout buttons visible, free
-      tier shows "Available after beta." on paid cards), and `/platform`
-      access (admin only) all render.
+- [ ] `/winners` and `/{orgSlug}/winners` both return 404. Anonymous access to
+      `/dashboard/lottery` requires sign-in.
+- [ ] An organization member can view registrations, winner References, and
+      ticket lookup/check-in. Draw, email retry, settings, and billing controls
+      are available only to organization admins; `/platform` requires a
+      platform-admin user.
+- [ ] Look up a winning Reference, confirm pickup, and repeat the check-in:
+      exactly one redemption succeeds and the original check-in timestamp is
+      preserved. Another organization's Reference is invalid. Verify the
+      participant's active/checked-in counts after redemption.
+- [ ] Org settings and `/billing` render for an admin; paid checkout buttons are
+      hidden and paid cards show "Available after beta."
 - [ ] `/dashboard/participants` renders and search/pagination work on the test
-      org without loading every historical registrant into the browser.
+      org without loading every historical registrant into the browser. Email
+      search remains filtered on subsequent pages; name search and participant
+      history pagination also work.
 - [ ] Stripe webhook endpoint returns 200 on a test-mode event.
 - [ ] Atlas escalation dry-run: pick one beta test org, bump
       `maxRegistrantsPerDay` from 100 to 250 directly in Atlas, verify the next
@@ -186,6 +210,11 @@ Stripe-owned and will be reconciled when paid checkout opens post-beta.
 ## 7. Promote
 
 - [ ] Smoke passed on preview.
+- [ ] Verify the Production environment separately: database/indexes, app URL,
+      Clerk, Turnstile hostname/key pair, Inngest, Resend webhook, and test-mode
+      Stripe configuration are ready for `ticketfarm.ca`.
 - [ ] Promote the tested Vercel deployment to production.
+- [ ] Verify the new production build and its environment-dependent flows.
+      [Vercel rebuilds a promoted preview using production environment variables](https://vercel.com/docs/deployments/promote-preview-to-production).
 - [ ] Confirm `https://ticketfarm.ca` resolves and the marketing landing page
       loads.

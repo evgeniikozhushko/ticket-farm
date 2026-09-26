@@ -1,3 +1,36 @@
+# Beta launch readiness
+
+## Plan
+
+- [x] Confirm the new branch starts at the reviewed main commit and inspect local deployment prerequisites without exposing secrets.
+- [x] Update the launch checklist for the current branch workflow, preview environment, private results, and redemption checks.
+- [x] Identify the Vercel project and inspect its production/preview deployments, domain attachment, and environment-variable coverage without reading secret values.
+- [ ] Configure distinct Preview provider/database values and add the missing Resend webhook and Turnstile variables before using a preview for registration smoke tests.
+- [ ] Verify the preview database indexes and run the preview registration, draw, email, redemption, and permissions smoke tests.
+- [ ] Record preview evidence and remaining production setup before promotion.
+
+## Current evidence
+
+- `chore/beta-launch-readiness` and `main` both start at `94520b5`; the worktree was clean when this task started.
+- That commit passed 35 test files / 246 tests, lint, type checking, build, and diff checks in the preceding task.
+- No `.vercel` project link, Vercel CLI, or GitHub CLI was found in this checkout/session.
+- Only local environment variable names/presence were inspected. `.env.local` has MongoDB, Resend API, Clerk, and seed settings; it lacks the Turnstile, Inngest, Resend webhook, Stripe, platform-admin, and app-URL settings listed in the launch checklist. Remote configuration is unverified.
+- Requested the Vercel project dashboard or preview URL to resolve the deployment target.
+- User supplied `https://ticketfarm.ca/`, the production domain. Public checks on 2026-09-26 confirmed Vercel hosting, HTTP 200 for `/` and `/sign-in`, HTTP 404 for `/winners` and `/example-org/winners`, and HTTP 307 to `/sign-in` for an anonymous HTML GET to `/dashboard/lottery`.
+- User supplied the Vercel project URL: `https://vercel.com/evgeniis-projects-797be76f/ticket-farm`. Before CLI login, its project API returned “missing an authentication token”; no launch-branch push was made.
+- Public checks alone did not identify the deployed source commit, preview environment, or configured database. No registration, draw, email, or database writes were performed.
+- Authenticated Vercel CLI inspection on 2026-09-26 found the project deployed from `main` in Production (`dpl_DUmdoZ6Li14A9pDRrKZKr9qYE8Z5`, Ready, `ticketfarm.ca`) and a Ready `fix/prod-ready` preview (`dpl_EEzgGn8oWrgcyLVcVaPMrPgLmvxn`). The preview URL is `https://ticket-farm-ma1q4czgd-evgeniis-projects-797be76f.vercel.app`.
+- `ticketfarm.ca` is attached to the project and served through Vercel’s Edge Network. The optional `www` lookup resolves to the parent domain record; it was not listed as a production deployment alias.
+- Vercel has the expected MongoDB, Clerk, Resend API, Stripe, Inngest, app URL, and platform-admin variable names applied to both Production and Preview. The required `RESEND_WEBHOOK_SECRET`, `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`, and `TURNSTILE_ALLOWED_HOSTNAMES` are absent. No variable values were read. Because the existing records target both environments, the CLI cannot establish the required separate preview database/provider values; create distinct Preview records before public-registration smoke testing. The beta Stripe price-ID variables are absent as intended.
+- The project is connected to GitHub deployment branches (production alias `ticket-farm-git-main-…`, preview alias `ticket-farm-git-fix-prod-ready-…`). Vercel does not expose external Clerk, Resend, Inngest, Stripe, or Turnstile dashboard configuration through the CLI, so those provider-side settings remain unverified.
+
+## Review — local launch preparation
+
+- Updated `BETA_DEPLOY_CHECKLIST.md` to identify the actual production branch/settings, configure preview separately, record its commit/URL, include participant-summary indexes, and verify private-result routes, staff permissions, redemption, and paginated search.
+- Added separate production configuration/build verification at promotion, with the official Vercel promotion reference.
+- Reviewed the documentation diff and ran `git diff --check` successfully. Application code is unchanged; the previously passing code checks were not repeated for this documentation-only change.
+- Remote configuration, database/index setup, deployment, and preview smoke remain pending the missing configuration and provider-side setup. No remote settings or databases were changed.
+
 # Fix merge-review findings
 
 ## Plan
