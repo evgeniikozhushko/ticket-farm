@@ -14,6 +14,7 @@ import type {
   ResultEmailRecipient,
   Lottery,
   Organization,
+  ParticipantSummaryDocument,
   Registrant,
   Ticket,
 } from "@/lib/types";
@@ -147,6 +148,12 @@ describe.skipIf(!uri)(
       await db
         .collection("organizations")
         .createIndex({ slug: 1 }, { unique: true });
+      await db
+        .collection("participant_summaries")
+        .createIndex({ orgId: 1, email: 1 }, { unique: true });
+      await db
+        .collection("participant_summaries")
+        .createIndex({ orgId: 1, normalizedName: 1, email: 1 });
     });
     afterAll(async () => {
       if (db) await db.dropDatabase();
@@ -165,6 +172,7 @@ describe.skipIf(!uri)(
         "result_email_recipients",
         "public_registration_rate_limits",
         "organizations",
+        "participant_summaries",
       ])
         await db.collection(name).deleteMany({});
       const now = new Date();
@@ -181,6 +189,25 @@ describe.skipIf(!uri)(
         maxRegistrantsPerDay: 100,
         createdAt: now,
         updatedAt: now,
+      });
+    });
+
+    it("creates the participant summary with a successful registration", async () => {
+      expect(await enter("summary@example.com")).toEqual({ success: true });
+
+      expect(
+        await db
+          .collection<ParticipantSummaryDocument>("participant_summaries")
+          .findOne({ orgId: "org_a", email: "summary@example.com" }),
+      ).toMatchObject({
+        orgId: "org_a",
+        email: "summary@example.com",
+        latestName: "Person",
+        normalizedName: "person",
+        entryCount: 1,
+        winCount: 0,
+        activeTicketCount: 0,
+        checkedInTicketCount: 0,
       });
     });
 
@@ -255,6 +282,9 @@ describe.skipIf(!uri)(
         success: false,
       });
       await assertCount(0);
+      expect(
+        await db.collection("participant_summaries").countDocuments({}),
+      ).toBe(0);
       expect(
         await db
           .collection("public_registration_rate_limits")

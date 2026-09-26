@@ -1,3 +1,31 @@
+# Complete `fix/prod-ready` verification
+
+## Plan
+
+- [x] Inspect the participant-summary write paths, backfill, integration fixtures, and existing readiness checklist.
+- [x] Add real-MongoDB summary coverage for successful/failed registration, successful/failed draw, and exactly-once redemption.
+- [x] Make the backfill callable from tests without changing its command-line behavior, and cover replacement, tenant isolation, ticket states, changing names, and idempotency.
+- [x] Run the targeted replica-set tests and the full replica-set suite.
+- [x] Run lint, type checking, production build, and `git diff --check`.
+- [x] Review the final diff and worktree, close findings #15 and #16, and record final verification evidence.
+
+## Review
+
+### Changes
+
+- Added disposable-replica-set assertions for registration, draw rollback/counters, exactly-once redemption counters, and backfill replacement/idempotency across organizations.
+- Exported the database-scoped backfill operation while preserving the existing environment-driven command-line entry point.
+
+### Verification
+
+- Targeted real-MongoDB integration tests — 3 files / 19 tests passed; focused participant, registration, draw, and redemption unit tests — 4 files / 76 tests passed.
+- Full replica-set suite — 34 files / 237 tests passed with no integration skips.
+- `pnpm lint`, `pnpm exec tsc --noEmit --incremental false`, `pnpm build`, and `git diff --check` — passed.
+
+### Notes
+
+- Verification used only the localhost disposable replica set and randomly named test databases. No production database, dependency, public API, schema, commit, push, or deployment was changed.
+
 # Operational integrity controls (finding #16)
 
 ## Plan
@@ -6,13 +34,13 @@
 - [x] Expand the read-only required-index verifier to cover all foundational unique invariants created by `setupIndexes`.
 - [x] Keep the winner lookup tenant-scoped and return explicit unavailable results from lottery dashboard queries instead of fabricated empty/open data; update the dashboard to render that state safely.
 - [x] Add focused unavailable-state coverage; the winner lookup was already tenant-scoped in the current revision.
-- [ ] Run the broader suite and production build; targeted tests, lint, type checking, and diff checks passed.
+- [x] Run the broader suite and production build; the complete replica-set suite and all static/build checks passed.
 
-## Interim review
+## Final review
 
 - Required-index verification now covers registrant, lottery, ticket, and organization uniqueness invariants alongside the existing operational indexes.
 - A failed dashboard stats query now carries an explicit unavailable marker and renders a retry-safe staff message instead of healthy-looking empty data.
-- `pnpm test tests/dashboard-permissions.test.tsx`, `pnpm lint`, `pnpm exec tsc --noEmit --incremental false`, and `git diff --check` passed.
+- The final replica-set suite passed all 34 files / 237 tests; `pnpm lint`, `pnpm exec tsc --noEmit --incremental false`, `pnpm build`, and `git diff --check` also passed.
 
 ## Deferred follow-up
 
@@ -28,10 +56,10 @@
 - [x] Replace the all-history participant aggregation with bounded indexed summary queries. Use explicit email and name prefix search modes with matching sort/cursor keys, rather than an unindexable `$or` query; preserve the page's list result contract.
 - [x] Cursor-paginate selected participant history by the stable registration date and fetch only tickets for that page. Bound the lottery dashboard's daily registrant display with a visible truncated-result indication rather than silently omitting rows.
 - [x] Add an idempotent backfill script that derives summaries from registrants and tickets. Document a maintenance-window deployment sequence: create indexes, pause registration/draw/redemption writes, run and validate the backfill, deploy the readers/writers, then resume writes. Do not run a live rebuild alongside unsynchronized writers.
-- [ ] Add disposable-replica-set coverage for summary correctness across registration/draw/redemption and the backfill script; focused unit coverage for read and redemption contracts is complete.
-- [ ] Re-run full local replica-set verification once the disposable server is reachable; lint, type check, production build, and diff checks passed.
+- [x] Add disposable-replica-set coverage for summary correctness across registration/draw/redemption and the backfill script; focused unit coverage for read and redemption contracts is complete.
+- [x] Re-run full local replica-set verification; all integration, static, and production-build checks passed.
 
-## Interim review
+## Final review
 
 ### Changes
 
@@ -40,14 +68,14 @@
 
 ### Verification
 
-- Focused participant, registration, draw, and redemption tests — 73 passed.
-- Mocked full suite — 29 files / 207 tests passed; four local-only integration files skipped without the test URI.
+- Focused participant, registration, draw, and redemption unit tests — 4 files / 76 tests passed.
+- Targeted summary integration tests — 3 files / 19 tests passed against the disposable replica set.
+- Full replica-set suite — 34 files / 237 tests passed with no integration skips.
 - `pnpm lint`, `pnpm exec tsc --noEmit --incremental false`, `pnpm build`, and `git diff --check` — passed.
 
-### Remaining verification
+### Verification environment
 
-- The disposable localhost replica set timed out during connection setup even after attempting to start its existing server process. The real-database summaries/backfill checks remain pending; no production database was accessed.
-- **Before declaring the production-readiness plan complete:** repair the local replica set, add the pending summary/backfill integration coverage, and rerun the full local replica-set suite for finding #15.
+- Recreated the stopped localhost-only disposable replica set and used randomly named databases that each test suite dropped afterward. No production database was accessed.
 
 ## Platform directory batching (finding #15, part B)
 
@@ -58,7 +86,7 @@
 - [x] Replace the five-per-organization fan-out with set-based aggregations scoped to the current page: total registrants, total tickets, last activity, and daily counts bucketed by each organization's local date.
 - [x] Preserve the existing row fields, add a directory result cursor, and add a Next-page control to the platform page.
 - [x] Update directory unit tests for authorization, bounded organization reads, timezone buckets, and aggregation-based metrics.
-- [x] Run targeted tests, lint, type check, production build, and diff checks; local replica-set verification remains separately blocked.
+- [x] Run targeted tests, lint, type check, production build, and diff checks; final local replica-set verification completed in the finding #15 gate above.
 
 ### Review
 

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { MongoClient, ObjectId, type Db } from "mongodb";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import type { EmailDispatch, Lottery, Registrant, ResultEmailRecipient, Ticket } from "@/lib/types";
+import type { EmailDispatch, Lottery, ParticipantSummaryDocument, Registrant, ResultEmailRecipient, Ticket } from "@/lib/types";
 
 // Opt-in, disposable LOCAL replica set only. Never uses the app's database URI.
 const uri = process.env.TICKET_FARM_TEST_MONGODB_URI;
@@ -38,6 +38,8 @@ describe.skipIf(!uri)("real MongoDB draw and redemption", () => {
     client = await MongoClient.connect(uri!);
     db = client.db(`ticket_farm_test_${randomUUID().replaceAll("-", "")}`);
     await db.collection("tickets").createIndex({ ticketId: 1 }, { unique: true });
+    await db.collection("participant_summaries").createIndex({ orgId: 1, email: 1 }, { unique: true });
+    await db.collection("participant_summaries").createIndex({ orgId: 1, normalizedName: 1, email: 1 });
   });
   afterAll(async () => {
     if (db) await db.dropDatabase(); // Only the random database created above.
@@ -46,7 +48,7 @@ describe.skipIf(!uri)("real MongoDB draw and redemption", () => {
   beforeEach(async () => {
     hooks.failOutbox = false;
     hooks.dispatch.mockReset().mockResolvedValue(true);
-    for (const name of ["registrants", "lotteries", "tickets", "email_dispatches", "result_email_recipients"]) await db.collection(name).deleteMany({});
+    for (const name of ["registrants", "lotteries", "tickets", "email_dispatches", "result_email_recipients", "participant_summaries"]) await db.collection(name).deleteMany({});
   });
 
   async function seedDraw() {
@@ -55,6 +57,20 @@ describe.skipIf(!uri)("real MongoDB draw and redemption", () => {
     }));
     await db.collection("registrants").insertMany(entrants);
     await db.collection("registrants").insertOne({ ...entrants[0], _id: new ObjectId(), orgId: "org_b" });
+    await db.collection<ParticipantSummaryDocument>("participant_summaries").insertMany(
+      entrants.map((entrant) => ({
+        orgId: entrant.orgId,
+        email: entrant.email,
+        latestName: entrant.name,
+        normalizedName: entrant.name.toLowerCase(),
+        firstEnteredAt: entrant.enteredAt,
+        lastEnteredAt: entrant.enteredAt,
+        entryCount: 1,
+        winCount: 0,
+        activeTicketCount: 0,
+        checkedInTicketCount: 0,
+      })),
+    );
     await db.collection("lotteries").insertOne({ orgId: "org_a", date: "2026-09-14", status: "OPEN" });
     return entrants;
   }
@@ -74,6 +90,11 @@ describe.skipIf(!uri)("real MongoDB draw and redemption", () => {
     const recipients = await db.collection<ResultEmailRecipient>("result_email_recipients").find({ drawDispatchId: original._id }).toArray();
     expect(recipients.filter((r) => r.kind === "winner").map((r) => r.ticket!.email)).toEqual([winner.email]);
     expect(recipients.filter((r) => r.kind === "non_winner").map((r) => r.nonWinner!.registrantId).sort()).toEqual(entrants.filter((r) => r.email !== winner.email).map((r) => r._id.toString()).sort());
+    expect(await db.collection("participant_summaries").findOne({ orgId: "org_a", email: winner.email })).toMatchObject({
+      winCount: 1,
+      activeTicketCount: 1,
+      checkedInTicketCount: 0,
+    });
     await db.collection("registrants").insertOne({ orgId: "org_a", date: "2026-09-14", email: "late@example.com", name: "Late", enteredAt: new Date() });
     const alreadySent = recipients.find((r) => r.kind === "non_winner")!.nonWinner!;
     await db.collection("registrants").updateOne({ _id: new ObjectId(alreadySent.registrantId) }, { $set: { nonWinnerEmailSent: true } });
@@ -95,6 +116,17 @@ describe.skipIf(!uri)("real MongoDB draw and redemption", () => {
     expect(await db.collection("tickets").countDocuments()).toBe(0);
     expect(await db.collection("email_dispatches").countDocuments()).toBe(0);
     expect(await db.collection("result_email_recipients").countDocuments()).toBe(0);
+    const summaries = await db.collection("participant_summaries")
+      .find({ orgId: "org_a" })
+      .toArray();
+    expect(summaries).toHaveLength(3);
+    expect(
+      summaries.every((summary) =>
+        summary.winCount === 0 &&
+        summary.activeTicketCount === 0 &&
+        summary.checkedInTicketCount === 0
+      ),
+    ).toBe(true);
     expect(await db.collection("lotteries").findOne({ orgId: "org_a" })).toMatchObject({ status: "OPEN" });
     expect(hooks.dispatch).not.toHaveBeenCalled();
   });
@@ -112,6 +144,11 @@ describe.skipIf(!uri)("real MongoDB draw and redemption", () => {
     expect(checkedIn.checkedInAt).toBeInstanceOf(Date);
     expect(await redeemTicketReference(ticket.ticketId)).toMatchObject({ outcome: "already_redeemed" });
     expect((await db.collection<Ticket>("tickets").findOne({ _id: ticket._id }))!.checkedInAt).toEqual(checkedIn.checkedInAt);
+    expect(await db.collection("participant_summaries").findOne({ orgId: "org_a", email: ticket.email })).toMatchObject({
+      winCount: 1,
+      activeTicketCount: 0,
+      checkedInTicketCount: 1,
+    });
   });
 
   it("cannot look up or redeem another organization's ticket", async () => {
