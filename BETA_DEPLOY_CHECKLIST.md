@@ -131,6 +131,9 @@ creation stays owned by the in-app onboarding flow.
 
 Run against the Vercel preview URL.
 
+For the launch branch's dated execution results and remaining work, see
+[`reports/beta-preview-validation-2026-09-30.md`](reports/beta-preview-validation-2026-09-30.md).
+
 - [ ] Sign up a new user; create an org via onboarding; land on lottery
       dashboard.
 - [ ] Public registration at `<preview>/{orgSlug}` works with Turnstile; duplicate
