@@ -11,13 +11,36 @@
 - [x] Record deferred Preview scenarios and remaining Production configuration, promotion, and post-deployment checks.
 - [x] Run documentation checks and review the final diff.
 
+## Next steps — execute in order
+
+These are outstanding launch gates. The completed checklist above records preparation and documentation, not approval to launch.
+
+- [ ] Identify the Ready Preview deployment to test; record its immutable deployment URL/ID and source commit in the validation report. Confirm it still uses the isolated Preview database and providers.
+- [ ] Verify public registration enforcement on a fresh, undrawn test organization/date: keep a registration form open, disable the public page, then submit from that form and repeat fresh page/admission requests. Confirm rejection with no new registration or counter increment. Re-enable and confirm a new admission succeeds immediately.
+- [ ] Verify the quota boundary on an undrawn test organization/date with 100 admitted registrations: confirm a new unique entry is rejected at cap 100, raise the cap to 250 in Atlas, and confirm the next unique entry succeeds as entry 101 without waiting for a cache TTL. Restore cap 100; confirm another unique entry is rejected and the 101 admitted entries remain intact.
+- [ ] Create a second Preview organization; confirm its staff cannot look up or redeem the first organization's winning Reference and the original ticket remains unchanged.
+- [ ] Exercise multiple participant-directory and selected-history pages; confirm email-prefix filtering persists across pages, name search works, and history pagination has no missing or repeated entries.
+- [ ] Run the bounced-email scenario; confirm the signed Resend event updates the stored recipient/ticket delivery outcome and the participant display.
+- [ ] Confirm Stripe credentials are test-mode before configuring its Preview webhook. Send a signed test event and verify HTTP 200; keep paid price IDs unset.
+- [ ] Update the dated report with each result and remaining failure; complete all required Preview checks in `BETA_DEPLOY_CHECKLIST.md` before promotion.
+- [ ] Verify Production database/indexes, `APP_URL`, Clerk, Turnstile hostname/key pair, Inngest, Resend API/webhook secret, test-mode Stripe, and platform-admin allowlist. Configure and verify the missing Production Resend webhook; keep paid price IDs unset.
+- [ ] Confirm automated release gates apply to the exact application revision being released; rerun them if application code changed. Promote the verified source only after Preview and Production configuration gates pass.
+- [ ] Verify the Production build and `ticketfarm.ca`: onboarding, registration, draw/email, ticket redemption, authorization, provider webhooks, and error logs. Record results before declaring launch complete.
+- [ ] After QA, revoke temporary share access and remove or rotate temporary automation bypasses, accounting for any Preview webhook integrations that still need protected access; retain normal Preview protection.
+
 ## Current evidence
 
 - `chore/beta-launch-readiness` produced a Ready protected Preview at the stable branch URL recorded in `reports/beta-preview-validation-2026-09-30.md`.
 - Branch-specific Preview settings are configured for the isolated MongoDB database, Clerk Development instance, Turnstile widget, Resend key/webhook, Inngest environment, app URL, and platform-admin allowlist. No secret values are recorded in the repository.
 - MongoDB connectivity and all required deployment indexes passed for `ticket_farm_preview`.
 - The core free-beta workflow passed end to end: onboarding, registration and duplicate handling, draw, Inngest dispatch/recovery, delivered-email webhook, ticket lookup, exactly-once redemption, participant state, settings, billing beta state, authorization, private routes, and immediate public-page disable/re-enable behavior.
-- Stripe, bounced-email handling, cross-organization Reference rejection, live pagination, the Atlas quota-change dry run, Production configuration/promotion, and post-deployment smoke remain outstanding. The dated report is the authoritative detailed record.
+- Stripe, bounced-email handling, cross-organization Reference rejection, live pagination, the Atlas quota-change dry run, disabled-page admission enforcement, Production configuration/promotion, and post-deployment smoke remain outstanding. Public-page visibility was verified; rejection of submissions while disabled was not recorded. The dated report is the authoritative detailed record.
+
+## Review — launch plan clarification
+
+- Added ordered outstanding launch gates with explicit pass conditions for quota changes and disabled-page submissions.
+- Aligned the report and reusable quota checklist; marked the older Production Beta Readiness section as historical and superseded.
+- Verification: documentation diff reviewed; `git diff --check` passed. No application code or external configuration changed; live scenarios remain unchecked until executed.
 
 ## Review — Preview validation documentation
 
@@ -387,6 +410,8 @@ Pre-launch assumption: no historical counter reconciliation or production migrat
 - No dependencies added. Existing untracked `AGENTS.md` and previous task history preserved. Final diff reviewed; no commits or deployment performed.
 
 # Production Beta Readiness — todo.md
+
+> Historical record — superseded by the current Beta launch readiness plan at the top of this file, the dated Preview validation report, and `BETA_DEPLOY_CHECKLIST.md`. Do not execute the older smoke/release instructions below: duplicate entries now return ordinary success, private winners routes return 404, and quota changes must take effect on the next admission without a cache-TTL wait. Unchecked historical items do not represent current execution status.
 
 ## Summary
 

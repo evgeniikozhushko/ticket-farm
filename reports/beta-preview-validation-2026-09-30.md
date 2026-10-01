@@ -61,7 +61,7 @@ private ticket References are recorded in this report.
 | Organization member permissions | Passed | A non-admin member could view lottery, registrant, winner Reference, and ticket lookup/check-in data, but had no settings or billing controls. Direct member requests to those pages redirected to the lottery dashboard. |
 | Platform authorization | Passed | `/platform` returned 404 before the user was included in the Preview platform-admin allowlist, rendered for the configured platform admin after redeploy, and remained 404 for the ordinary organization member. |
 | Private result routes | Passed | `/winners` and the organization winners route returned 404. A signed-out request to `/dashboard/lottery` required Clerk sign-in. |
-| Public-page authority | Passed | Disabling the public registration page made the organization route return 404 immediately; re-enabling it made the next request render successfully. |
+| Public-page authority | Partial | Disabling the public registration page made the organization route return 404 immediately; re-enabling it made the next request render successfully. Admission rejection while disabled remains unverified. |
 | Preview logs | Passed | A post-fix Vercel error-log check found no unhandled Preview errors during the validated workflow. |
 
 The code baseline used for this launch branch had already passed 35 test files /
@@ -72,6 +72,10 @@ checks were not rerun for this documentation-only evidence update.
 
 ### Preview scenarios
 
+- On a fresh, undrawn test organization/date, keep a registration form open,
+  disable the public page, and submit from that form. Repeat fresh page and
+  admission requests; confirm rejection without new registrations or counter
+  increments. Re-enable and verify the next valid admission succeeds immediately.
 - Configure and verify the Stripe webhook with Stripe test-mode credentials.
   Confirm `/api/webhooks/stripe` returns 200 for a signed test event. Paid
   checkout remains intentionally unavailable until after beta.
@@ -83,10 +87,12 @@ checks were not rerun for this documentation-only evidence update.
 - Seed enough participant data to exercise multiple pages. Verify email search
   stays filtered across pages, name search works, and selected-participant
   history pagination remains bounded and correct.
-- Perform the Atlas quota-change dry run: change a test organization from 100
-  to 250 registrations/day, verify the next admission observes the new limit,
-  then restore the original setting. Use a fresh organization/date because the
-  validated test lottery is already drawn.
+- Perform the Atlas quota-change dry run on an undrawn test organization/date
+  with 100 admitted registrations. Verify a new unique entry is rejected at cap
+  100, raise the cap to 250, and verify the next unique entry succeeds as entry
+  101 without a cache-TTL wait. Restore cap 100 and verify further unique entries
+  are rejected while all 101 admitted registrations remain intact. Use a fresh
+  organization/date because the validated test lottery is already drawn.
 
 ### Production readiness and promotion
 

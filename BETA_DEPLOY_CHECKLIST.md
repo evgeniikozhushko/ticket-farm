@@ -185,11 +185,12 @@ For the launch branch's dated execution results and remaining work, see
       search remains filtered on subsequent pages; name search and participant
       history pagination also work.
 - [ ] Stripe webhook endpoint returns 200 on a test-mode event.
-- [ ] Atlas escalation dry-run: pick one beta test org, bump
-      `maxRegistrantsPerDay` from 100 to 250 directly in Atlas, verify the next
-      public registration observes the new limit, then reset the org. Already
-      admitted registrations remain valid; lowering a cap below today's count
-      stops further admission for that day.
+- [ ] Atlas escalation dry-run: use an undrawn beta test org/date with 100 admitted
+      registrations. Verify a new unique entry is rejected at cap 100, bump
+      `maxRegistrantsPerDay` to 250 directly in Atlas, and verify the next unique
+      entry succeeds as entry 101 without waiting for a cache TTL. Restore cap
+      100; verify another unique entry is rejected and all 101 admitted
+      registrations remain valid.
 - [ ] Public-page authority smoke: disable a beta test org's public page, then
       repeat page and admission requests across fresh requests/instances and
       confirm they are refused immediately. Re-enable it and confirm the next
