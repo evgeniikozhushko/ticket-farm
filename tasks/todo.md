@@ -1,3 +1,47 @@
+# Resolve free-beta release blockers
+
+## Plan — authorized by user request to resolve blockers
+
+- [x] Inspect the audit, dispatch worker, recovery flow, delivery projections, and existing test coverage; preserve existing documentation changes.
+- [x] Fix R2 so unresolved recipients do not block later batches, while preserving retries, provider idempotency, and a visible unresolved-outcome signal.
+- [x] Fix R3 so overlapping webhook and worker updates cannot regress winner or non-winner delivery status; reuse the existing delivery ordering rule.
+- [x] Add focused regression coverage for multi-batch dispatch, recovery/manual retry, transient failures, and concurrent delivery projections.
+- [x] Run targeted checks, relevant MongoDB integration tests using a disposable local database, lint, type checking, and build; document any blocked checks.
+- [x] Review the final diff and record changes, verification, and remaining release gates.
+- [x] Refresh vulnerable production dependency trees and verify the production audit.
+- [x] Add a release verification command that requires a ready local replica set; document reproducible setup.
+- [x] Document shutdown, data-request, monitoring, restore, and rollback procedures; record actual external evidence separately.
+- [x] Inspect available Preview/Production access; identify missing access and operator decisions.
+- [ ] Complete the live Preview/Production gates, restore/capacity evidence, operator assignment, and shutdown/deletion drill listed in the remediation report; browser permissions are currently unavailable.
+
+Scope: free-beta blockers R1–R7. R8 and paid billing remain deferred with paid price IDs unset. No branch, commit, push, merge, or Production deployment is requested.
+
+## Review — October 2 remediation
+
+- Fixed email traversal/retries and atomic delivery projections; removed cleartext recipient information from routine send-error logs.
+- Patched production dependencies with a reproducible lockfile; added mandatory replica-set release checks and attended operations procedures; updated privacy handling text.
+- Added real MongoDB concurrency, recovery/manual-retry, 100/250 quota-boundary and re-enable checks, plus actual Resend signature compatibility coverage.
+- `pnpm install --frozen-lockfile` passed. Full `pnpm check:release` passed: lint, types, 36 files / 255 tests / no skips, no known production vulnerabilities, and build. Missing-URI/unavailable-DB preflight correctly fails.
+- Final diff reviewed and `git diff --check` passed. Existing audit documentation was preserved. No external provider, Production data, branch, commit, push, merge or deployment changed.
+- Detailed evidence and remaining release blockers: [October 2 remediation report](../reports/release-blocker-remediation-2026-10-02.md). Application gates pass; Production sign-off still needs external R5–R7 checks and the committed candidate revision.
+
+# Production audit — separate branch handoff
+
+## Plan
+
+- [x] Review authorization, tenant isolation, registration/draw/redemption integrity, email delivery, billing, and operational safeguards.
+- [x] Run available automated checks and identify any verification limits.
+- [x] Create `reports/production-release-audit-2026-09-30.md` with evidence, prioritized work, and acceptance criteria for a separate branch.
+- [x] Review the documentation diff and record verification. Audit only; application fixes and deployment are outside this task.
+
+## Review
+
+- Standalone handoff: [Production Release Audit and Remediation Backlog](../reports/production-release-audit-2026-09-30.md). Production sign-off is not recommended; implementation work remains in that document.
+- Lint, type checking, and production build passed. Default tests: 217 passed / 29 integration tests skipped. Explicit local-replica-set runs timed out in connection setup, including the retry outside the sandbox.
+- Production dependency audit failed: 1 critical, 3 high, 2 moderate, 1 low advisory. Application exploitability is distinguished from dependency severity in the report.
+- Two temporary local diagnostic tests reproduced blocked later email batches and delivery-status regression under concurrent webhooks; both were removed after execution. No application fix was applied.
+- Documentation diff reviewed and `git diff --check` passed. No branch, commit, deployment, dependency, or external configuration changes.
+
 # Beta launch readiness
 
 ## Plan

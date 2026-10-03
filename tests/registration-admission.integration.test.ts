@@ -308,6 +308,9 @@ describe.skipIf(!uri)(
         error: "This lottery page is not available.",
       });
       await assertCount(1);
+      await db.collection("organizations").updateOne({ clerkOrgId: "org_a" }, { $set: { publicPageEnabled: true } });
+      expect(await enter("after-reenable@example.com")).toEqual({ success: true });
+      await assertCount(2);
     });
 
     it("uses a changed quota on the next admission attempt", async () => {
@@ -334,6 +337,22 @@ describe.skipIf(!uri)(
         success: true,
       });
       await assertCount(2);
+    });
+
+    it("enforces the 100-entry boundary immediately after raising and restoring the cap", async () => {
+      expect(await enter("entry-0@example.com")).toEqual({ success: true });
+      await db.collection("registrants").insertMany(Array.from({ length: 99 }, (_, i) => ({
+        ...scope, email: `entry-${i + 1}@example.com`, name: "Synthetic", enteredAt: new Date(),
+      })));
+      await db.collection("lotteries").updateOne(scope, { $set: { registrantCount: 100 } });
+      await assertCount(100);
+      expect(await enter("entry-100@example.com")).toMatchObject({ success: false, error: "Registration is full for today. Check back tomorrow." });
+      await db.collection("organizations").updateOne({ clerkOrgId: "org_a" }, { $set: { maxRegistrantsPerDay: 250 } });
+      expect(await enter("entry-100@example.com")).toEqual({ success: true });
+      await assertCount(101);
+      await db.collection("organizations").updateOne({ clerkOrgId: "org_a" }, { $set: { maxRegistrantsPerDay: 100 } });
+      expect(await enter("entry-101@example.com")).toMatchObject({ success: false });
+      await assertCount(101);
     });
 
     it("concurrent duplicate requests create one registration and consume one slot", async () => {

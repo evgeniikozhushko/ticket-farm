@@ -2,7 +2,7 @@ import { inngest } from "@/inngest/client";
 import { sendBulkWinnerEmails, type EmailTicket, type NonWinnerEmail } from "@/lib/email";
 import { sendNonWinnerNotifications } from "@/lib/non-winner-notifications";
 import { getTicketsCollection } from "@/lib/mongodb";
-import { processResultEmailBatch } from "@/lib/result-email-delivery";
+import { getResultEmailDispatchStatus, processResultEmailBatch } from "@/lib/result-email-delivery";
 import type { Ticket } from "@/lib/types";
 import type { AnyBulkWriteOperation } from "mongodb";
 
@@ -80,24 +80,44 @@ export const sendWinnerEmailsFunction = inngest.createFunction(
       let afterId: string | undefined;
       let batch = 0;
       const totals = { sent: 0, failed: 0, skipped: 0, uncertain: 0 };
+      const retryBatches: { cursor?: string; batch: number; failed: number }[] = [];
       while (true) {
-        const result = await step.run(`result-email-batch-${batch++}`, async () => {
-          const outcome = await processResultEmailBatch(dispatchId, afterId);
-          if (outcome.failed || outcome.uncertain) {
-            throw new Error(`${outcome.failed} result emails failed; ${outcome.uncertain} need provider reconciliation.`);
-          }
-          return outcome;
-        });
+        const cursor = afterId;
+        const batchNumber = batch++;
+        // Checkpoint traversal separately from retries so every eligible recipient
+        // gets an attempt before an unresolved batch can fail the job.
+        const result = await step.run(`result-email-batch-${batchNumber}`, () =>
+          processResultEmailBatch(dispatchId, cursor)
+        );
         totals.sent += result.sent;
         totals.failed += result.failed;
         totals.skipped += result.skipped;
         totals.uncertain += result.uncertain;
+        if (result.failed) retryBatches.push({ cursor, batch: batchNumber, failed: result.failed });
         if (result.done) break;
         afterId = result.lastId;
       }
-      if (totals.failed || totals.uncertain) {
-        throw new Error(`${totals.failed} result emails failed; ${totals.uncertain} need provider reconciliation.`);
+      for (const retry of retryBatches) {
+        try {
+          const result = await step.run(`result-email-retry-${retry.batch}`, async () => {
+            const outcome = await processResultEmailBatch(dispatchId, retry.cursor);
+            if (outcome.failed) throw new Error(`${outcome.failed} result emails failed.`);
+            return outcome;
+          });
+          totals.failed -= retry.failed;
+          totals.sent += result.sent;
+          totals.uncertain += result.uncertain;
+        } catch {
+          // Inngest retries each failed step before surfacing its final error.
+          // Continue other batches; completion checks the current database state.
+        }
       }
+      await step.run("result-email-completion", async () => {
+        const outstanding = await getResultEmailDispatchStatus(dispatchId);
+        if (outstanding.failed || outstanding.uncertain) {
+          throw new Error(`${outstanding.failed} result emails failed or pending; ${outstanding.uncertain} need provider reconciliation.`);
+        }
+      });
       return totals;
     }
     const totals = { sent: 0, failed: 0, skipped: 0 };

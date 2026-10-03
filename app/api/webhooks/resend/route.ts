@@ -1,11 +1,8 @@
 import { ObjectId } from "mongodb";
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
-import {
-  getRegistrantsCollection,
-  getResultEmailRecipientsCollection,
-  getTicketsCollection,
-} from "@/lib/mongodb";
+import { getResultEmailRecipientsCollection } from "@/lib/mongodb";
+import { syncResultEmailRecipient } from "@/lib/result-email-status";
 
 export const runtime = "nodejs";
 
@@ -86,29 +83,7 @@ export async function POST(req: NextRequest) {
     );
     const current = updated ?? await recipients.findOne({ _id: recipient._id });
     if (!current) return NextResponse.json({ received: true });
-    if (current.kind === "winner") {
-      const tickets = await getTicketsCollection();
-      await tickets.updateOne(
-        { orgId: current.orgId, date: current.date, ticketId: current.recipientId },
-        { $set: {
-          emailSent: true,
-          emailSentAt: current.acceptedAt ?? occurredAt,
-          emailMessageId: current.messageId,
-          emailDelivery: current.status === "delivery_failed" ? "failed" : current.status === "bounced" ? "bounced" : "delivered",
-        } }
-      );
-    } else {
-      const registrants = await getRegistrantsCollection();
-      await registrants.updateOne(
-        { orgId: current.orgId, date: current.date, _id: new ObjectId(current.recipientId) },
-        { $set: {
-          nonWinnerEmailSent: true,
-          nonWinnerEmailSentAt: current.acceptedAt ?? occurredAt,
-          nonWinnerEmailMessageId: current.messageId,
-          nonWinnerEmailDelivery: current.status === "delivery_failed" ? "failed" : current.status === "bounced" ? "bounced" : "delivered",
-        } }
-      );
-    }
+    await syncResultEmailRecipient(current);
     return NextResponse.json({ received: true });
   } catch (error) {
     console.error("[resend-webhook] Delivery update failed:", error);

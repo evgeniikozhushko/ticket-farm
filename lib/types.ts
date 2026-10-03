@@ -43,6 +43,8 @@ export interface Registrant {
   nonWinnerEmailSentAt?: Date;
   nonWinnerEmailError?: string;
   nonWinnerEmailMessageId?: string;
+  nonWinnerEmailDeliveryRank?: number;
+  nonWinnerEmailDeliveryAt?: Date;
   nonWinnerEmailDelivery?: "delivered" | "bounced" | "failed";
 }
 
@@ -86,6 +88,8 @@ export interface Ticket {
   emailSentAt?: Date;
   emailError?: string;
   emailMessageId?: string;
+  emailDeliveryRank?: number;
+  emailDeliveryAt?: Date;
   emailDelivery?: "delivered" | "bounced" | "failed";
 }
 

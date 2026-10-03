@@ -15,7 +15,7 @@ export default function PrivacyPage() {
           Privacy notice
         </h1>
         <p className="text-sm text-muted-foreground">
-          Last updated: September 2026. Ticket Farm is in private beta; this notice may change
+          Last updated: October 2026. Ticket Farm is in private beta; this notice may change
           as the product matures.
         </p>
 
@@ -73,6 +73,19 @@ export default function PrivacyPage() {
             billing (Stripe — currently in test mode during beta), and registration
             security checks (Cloudflare). Each handles data
             under their own terms.
+          </p>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-xl font-semibold">Data requests and retention</h2>
+          <p className="text-muted-foreground">
+            We verify data and deletion requests with the requester and the organization
+            that collected the information. Deletion includes checking queued email jobs
+            and stored recipient information. Outstanding ticket fulfillment and any
+            applicable retention requirements are reviewed with the organization.
+            Prior copies may remain in backups, security logs, or provider records until
+            their retention periods expire. We account for completed deletion requests
+            before restoring backup data to active use.
           </p>
         </section>
 

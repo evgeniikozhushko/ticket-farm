@@ -6,6 +6,7 @@ vi.mock("@/lib/non-winner-notifications", () => ({ sendNonWinnerNotifications: n
 
 const sendBulkWinnerEmailsMock = vi.hoisted(() => vi.fn());
 const processBatchMock = vi.hoisted(() => vi.fn());
+const dispatchStatusMock = vi.hoisted(() => vi.fn());
 const ticketsCollection = vi.hoisted(() => ({
   find: vi.fn(),
   bulkWrite: vi.fn(),
@@ -17,7 +18,7 @@ const createFunctionMock = vi.hoisted(() =>
 vi.mock("@/lib/email", () => ({
   sendBulkWinnerEmails: sendBulkWinnerEmailsMock,
 }));
-vi.mock("@/lib/result-email-delivery", () => ({ processResultEmailBatch: processBatchMock }));
+vi.mock("@/lib/result-email-delivery", () => ({ processResultEmailBatch: processBatchMock, getResultEmailDispatchStatus: dispatchStatusMock }));
 
 vi.mock("@/lib/mongodb", () => ({
   getTicketsCollection: vi.fn(() => Promise.resolve(ticketsCollection)),
@@ -89,6 +90,7 @@ describe("sendWinnerEmailsFunction", () => {
   beforeEach(() => {
     sendBulkWinnerEmailsMock.mockReset();
     processBatchMock.mockReset();
+    dispatchStatusMock.mockReset().mockResolvedValue({ failed: 0, uncertain: 0 });
     ticketsCollection.find.mockReset();
     ticketsCollection.bulkWrite.mockReset().mockResolvedValue({ modifiedCount: 1 });
     nonWinnerNotifications.mockReset().mockResolvedValue({ sent: 0, skipped: 0, failed: 0 });
@@ -190,11 +192,11 @@ describe("sendWinnerEmailsFunction", () => {
       event: { data: { orgId: "org_1", date: "2026-05-28", dispatchId: "507f1f77bcf86cd799439010" } },
       step,
     })).resolves.toMatchObject({ sent: 6, failed: 0 });
-    expect(step.run.mock.calls.map((call) => call[0])).toEqual(["result-email-batch-0", "result-email-batch-1"]);
+    expect(step.run.mock.calls.map((call) => call[0])).toEqual(["result-email-batch-0", "result-email-batch-1", "result-email-completion"]);
     expect(processBatchMock).toHaveBeenNthCalledWith(2, "507f1f77bcf86cd799439010", "507f1f77bcf86cd799439011");
   });
 
-  it("leaves a failed recipient batch retryable within its Inngest step", async () => {
+  it("retries failed recipients after checkpointing traversal", async () => {
     processBatchMock.mockResolvedValueOnce({ sent: 0, failed: 1, skipped: 0, uncertain: 0, done: true })
       .mockResolvedValueOnce({ sent: 1, failed: 0, skipped: 0, uncertain: 0, done: true });
     vi.resetModules();
@@ -208,6 +210,47 @@ describe("sendWinnerEmailsFunction", () => {
       step,
     })).resolves.toMatchObject({ sent: 1 });
     expect(processBatchMock).toHaveBeenCalledTimes(2);
-    expect(step.run).toHaveBeenCalledTimes(1);
+    expect(step.run).toHaveBeenCalledTimes(3);
+  });
+
+  it("attempts all 11 recipients before signaling uncertainty", async () => {
+    dispatchStatusMock.mockResolvedValue({ failed: 0, uncertain: 1 });
+    processBatchMock.mockResolvedValueOnce({ sent: 4, failed: 0, skipped: 0, uncertain: 1, lastId: "first", done: false })
+      .mockResolvedValueOnce({ sent: 5, failed: 0, skipped: 0, uncertain: 0, lastId: "second", done: false })
+      .mockResolvedValueOnce({ sent: 1, failed: 0, skipped: 0, uncertain: 0, lastId: "third", done: true });
+    const { sendWinnerEmailsFunction } = await import("@/inngest/functions/send-winner-emails");
+    const handler = sendWinnerEmailsFunction as unknown as (input: unknown) => Promise<unknown>;
+    const step = { run: vi.fn(async (_name: string, callback: () => Promise<unknown>) => callback()) };
+    await expect(handler({ event: { data: { orgId: "org_1", date: "2026-05-28", dispatchId: "draw" } }, step }))
+      .rejects.toThrow("1 need provider reconciliation");
+    expect(processBatchMock.mock.calls).toEqual([["draw", undefined], ["draw", "first"], ["draw", "second"]]);
+  });
+
+  it("does not cache a failed retry as successful or block another failed batch", async () => {
+    dispatchStatusMock.mockResolvedValueOnce({ failed: 1, uncertain: 0 }).mockResolvedValue({ failed: 0, uncertain: 0 });
+    const page = (lastId: string, done = false) => ({ sent: 4, failed: 1, skipped: 0, uncertain: 0, lastId, done });
+    processBatchMock.mockResolvedValueOnce(page("first")).mockResolvedValueOnce(page("second"))
+      .mockResolvedValueOnce({ sent: 1, failed: 0, skipped: 0, uncertain: 0, done: true })
+      .mockResolvedValueOnce(page("first"))
+      .mockResolvedValueOnce({ sent: 1, failed: 0, skipped: 4, uncertain: 0, done: false })
+      .mockResolvedValueOnce({ sent: 1, failed: 0, skipped: 4, uncertain: 0, done: false });
+    const { sendWinnerEmailsFunction } = await import("@/inngest/functions/send-winner-emails");
+    const handler = sendWinnerEmailsFunction as unknown as (input: unknown) => Promise<unknown>;
+    const checkpoint = new Map<string, unknown>();
+    const step = { run: vi.fn(async (name: string, callback: () => Promise<unknown>) => {
+      if (checkpoint.has(name)) return checkpoint.get(name);
+      const outcome = await callback();
+      checkpoint.set(name, outcome);
+      return outcome;
+    }) };
+    const input = { event: { data: { orgId: "org_1", date: "2026-05-28", dispatchId: "draw" } }, step };
+    await expect(handler(input)).rejects.toThrow("1 result emails failed or pending");
+    expect(checkpoint.has("result-email-retry-0")).toBe(false);
+    expect(checkpoint.has("result-email-retry-1")).toBe(true);
+    await expect(handler(input)).resolves.toMatchObject({ sent: 11, failed: 0 });
+    expect(processBatchMock.mock.calls).toEqual([
+      ["draw", undefined], ["draw", "first"], ["draw", "second"],
+      ["draw", undefined], ["draw", "first"], ["draw", undefined],
+    ]);
   });
 });
