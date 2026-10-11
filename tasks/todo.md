@@ -1,3 +1,81 @@
+# Latest Preview validation — October 3, 2026
+
+## Execution plan — October 11, 2026
+
+- [ ] Re-verify the committed candidate's automated release gate with a disposable MongoDB replica set and record exact evidence.
+- [x] Remediate the newly discovered production-audit dependency advisories, then repeat the audit and static/build verification.
+- [x] Add the local CI workflow for the release gate.
+- [ ] Verify its first remote run and required branch protection after commit/push.
+- [ ] Inspect available Vercel/Preview access and complete only safe, non-destructive live validation; record concrete access blockers if any remain.
+- [ ] Execute or document the remaining Preview R5 scenarios: tenant isolation, roles, pagination, multi-batch delivery/recovery, and signed provider webhooks.
+- [ ] Verify Production configuration and remote release protection without changing settings; keep paid price IDs unset.
+- [ ] Complete and document operating evidence: assigned coverage, backup/restore, capacity, rollback target, and synthetic shutdown/deletion drill.
+- [ ] Review the final evidence, update the readiness checklist, and identify any remaining authorization-dependent release steps.
+
+User authorized implementation of the approved free-beta readiness plan on October 11, 2026. Production promotion, external configuration changes, sends, and destructive data operations remain subject to their individual authorization and safety constraints.
+
+## Review — October 11 execution
+
+### Changes
+
+- Updated the affected Next.js dependency chain, corrected the resulting lint failures, and added a MongoDB replica-set GitHub Actions release workflow.
+- Recorded exact local verification and concrete external-access blockers in [the October 11 execution report](../reports/production-readiness-2026-10-11.md).
+
+### Verification
+
+- `pnpm audit:production`, lint, type checking, ordinary tests, frozen-lockfile install, workflow YAML parsing, and `git diff --check` passed. The initial build passed; the final Turbopack rerun encountered worker-port permission restrictions. See the execution report for alternate-build results.
+- `pnpm test:release` correctly refused to run without a disposable replica set; its integration suites are not yet re-verified for this uncommitted candidate.
+
+### Remaining blockers
+
+- Commit and deploy the new candidate, then validate the replica-set suite, first remote CI run/branch protection, all Preview R5 gates, Production configuration, and the R6/R7 operating drills.
+
+## Approved plan
+
+- [x] Inspect the candidate revision and preserve existing documentation changes.
+- [ ] Identify a Ready Preview for `84af0d05ae4d1363ace812d9fa3f69b89b199525`; record its immutable URL and deployment ID.
+- [ ] Verify isolated Preview database/indexes, provider configuration, app URL and Turnstile hostname; keep Stripe test-mode and paid price IDs unset.
+- [x] Validate stale-form rejection while registration is disabled, unchanged database counts, and immediate admission after re-enabling (user-reported manual pass; raw evidence not supplied).
+- [ ] Record sanitized deployment, database-count and log evidence; update only verified readiness gates.
+- [x] Review the documentation diff and record verification or concrete blockers.
+
+No commit, push, deployment or Production change is authorized by this plan.
+
+## Review — October 3 validation attempt
+
+- Confirmed the local candidate SHA; preserved the pre-existing readiness checklist additions.
+- Live validation is blocked: Chrome returned “Computer Use permissions are not granted”; neither Vercel nor GitHub CLI is installed. An available, uninstalled Vercel connector was suggested but is not yet connected.
+- Initial access attempt was blocked; subsequent manual handoff confirmed the Ready candidate URL, dashboard access and branch-specific Preview database configuration. The user confirmed live registration and quota scenarios passed; these gates are now recorded as user-reported passes in [the October 3 validation report](../reports/beta-preview-validation-2026-10-03.md). Raw counts/logs and deployment ID were not supplied; remaining provider/index checks stay open. No external state was changed by the agent.
+- Verification: documentation diff reviewed and `git diff --check` passed. No application tests rerun for this documentation-only update.
+
+# Production readiness — next steps
+
+This is the current checklist for continuing Production readiness. Existing application fixes and their automated verification are recorded in the [remediation report](../reports/release-blocker-remediation-2026-10-02.md). Complete each remaining item with dated evidence against the candidate source revision and environment; earlier local tests do not establish live provider or Production readiness.
+
+## Checklist
+
+- [ ] Record the exact Preview deployment URL/ID and source revision; confirm its isolated database and provider settings before testing.
+- [x] Validate live Preview registration: stale-form rejection, unchanged registration/counter values and immediate admission after re-enabling — user-confirmed manual pass on `84af0d0`; see October 3 report.
+- [x] Validate the live quota boundary: cap 100 rejects entry 101, cap 250 admits immediately, restored cap 100 rejects further admissions and preserves entries — user-confirmed manual pass on `84af0d0`; see October 3 report.
+- [ ] Verify cross-organization ticket lookup/redemption rejection, staff permissions, filtered participant pagination, and participant-history pagination.
+- [ ] Verify email delivery across multiple batches, including early failed/uncertain recipients, recovery, and manual retry; accepted recipients must not be resent and uncertain recipients must require reconciliation.
+- [ ] Verify signed delivered, bounced, failed, and test-mode Stripe webhook events against stored outcomes and participant displays; confirm paid checkout remains disabled.
+- [ ] Verify Production database indexes, provider settings, hostname restrictions, application URL, platform-admin allowlist, and the Resend webhook secret using the [deployment checklist](../BETA_DEPLOY_CHECKLIST.md).
+- [ ] Enforce the automated release checks in CI using a disposable MongoDB replica set; verify required branch checks. Use [release verification](../RELEASE_CHECKS.md) and require integration suites to execute without skips.
+- [ ] Measure performance at 100 and 250 registrations and with simultaneous organizations: admission errors, transaction latency, database connections, and email backlog. Fix demonstrated bottlenecks and record supported limits before enabling larger or unlimited quotas.
+- [ ] Establish primary/backup monitoring ownership and alerts for failed jobs, unresolved emails, webhook failures, and database outages; record attended pilot hours or independent outage coverage for unattended operation.
+- [ ] Verify backup retention, agree recovery targets, perform an isolated restore without sending email, and record recovery results and a compatible rollback target.
+- [ ] Demonstrate synthetic organization shutdown and participant deletion, including queued jobs, provider records, backup handling, and preservation of unrelated organizations/participants. Follow the [operations procedures](../BETA_OPERATIONS.md).
+- [ ] Fix failures discovered during these checks, repeat affected verification, and record results against the final candidate revision. After an authorized Production release, complete the environment-dependent smoke/log checks and temporary QA-access cleanup.
+
+Paid billing remains disabled. Stripe customer-creation concurrency and paid billing lifecycle tests remain prerequisites for enabling payments.
+
+## Review — readiness checklist documentation
+
+- Saved the remaining Production readiness work as a referenceable checklist and linked the existing evidence, deployment, verification, and operations documents.
+- Preserved prior task history; readiness checks remain unchecked until executed and documented.
+- Verification: documentation diff reviewed and `git diff --check` passed. Application tests were not rerun for this documentation-only update.
+
 # Resolve free-beta release blockers
 
 ## Plan — authorized by user request to resolve blockers

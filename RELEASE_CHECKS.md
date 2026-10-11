@@ -45,3 +45,11 @@ Production settings before merging: `main` automatically deploys Production.
 The build uses your configured local environment; independently verify Production
 environment values and the resulting Production build. Repository checks do not
 establish that GitHub branch protection or Vercel deployment gates are enabled.
+
+## GitHub Actions
+
+`.github/workflows/release.yml` runs `pnpm check:release` on pull requests and
+pushes to `main`, using a disposable MongoDB replica set and placeholder provider
+configuration for the build. It does not use Production database credentials or
+send email. Require the `release` job in branch protection after its first remote
+run passes. A local YAML parse does not establish that the remote job passes.

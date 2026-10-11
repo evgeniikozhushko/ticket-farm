@@ -71,10 +71,19 @@ export function LotteryDrawPanel({
   >();
 
   useEffect(() => {
-    setStatus(initialStatus);
-    setWinners(initialWinners);
-    setLastDrawnAt(drawnAt);
-    setEmailDispatchError(undefined);
+    let active = true;
+
+    queueMicrotask(() => {
+      if (!active) return;
+      setStatus(initialStatus);
+      setWinners(initialWinners);
+      setLastDrawnAt(drawnAt);
+      setEmailDispatchError(undefined);
+    });
+
+    return () => {
+      active = false;
+    };
   }, [initialStatus, initialWinners, drawnAt]);
 
   const handleDraw = async () => {
