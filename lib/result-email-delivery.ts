@@ -30,9 +30,13 @@ export async function processResultEmailBatch(drawDispatchId: string, afterId?: 
       counts.uncertain++;
       continue;
     }
+    if (row.status === "sending" && row.claimedAt && row.claimedAt.getTime() + LEASE_MS > now.getTime()) {
+      counts.skipped++;
+      continue;
+    }
     if (row.attempts >= MAX_ATTEMPTS) {
       await recipients.updateOne(
-        { _id: row._id, status: row.status, attempts: { $gte: MAX_ATTEMPTS } },
+        { _id: row._id, status: row.status, ...(row.claimToken ? { claimToken: row.claimToken } : {}), attempts: { $gte: MAX_ATTEMPTS } },
         { $set: { status: "uncertain", updatedAt: now, lastError: "Email attempts exhausted; reconcile with Resend." },
           $unset: { claimToken: "" } }
       );
@@ -49,10 +53,6 @@ export async function processResultEmailBatch(drawDispatchId: string, afterId?: 
       continue;
     }
     if ((row.status === "sending" || row.status === "failed") && row.claimedAt) {
-      if (row.status === "sending" && row.claimedAt.getTime() > now.getTime() - LEASE_MS) {
-        counts.skipped++;
-        continue;
-      }
       if (row.claimedAt.getTime() <= now.getTime() - IDEMPOTENCY_MS) {
         await recipients.updateOne(
           { _id: row._id, status: row.status, ...(row.claimToken ? { claimToken: row.claimToken } : {}) },
@@ -69,7 +69,7 @@ export async function processResultEmailBatch(drawDispatchId: string, afterId?: 
         _id: row._id,
         $or: [
           { status: { $in: ["pending", "failed"] } },
-          { status: "sending", claimedAt: { $lt: new Date(now.getTime() - LEASE_MS) } },
+          { status: "sending", claimedAt: { $lte: new Date(now.getTime() - LEASE_MS) } },
         ],
       },
       [{ $set: {
@@ -113,8 +113,14 @@ export async function processResultEmailBatch(drawDispatchId: string, afterId?: 
     if (result.success) counts.sent++;
     else counts.failed++;
   }
+  // Include claims acquired by another worker after our initial read.
+  const leased = await recipients.findOne(
+    { _id: { $in: rows.map((row) => row._id) }, status: "sending" },
+    { sort: { claimedAt: -1 }, projection: { claimedAt: 1 } },
+  );
   return {
     ...counts,
+    leaseUntil: leased?.claimedAt ? leased.claimedAt.getTime() + LEASE_MS : undefined,
     lastId: rows.at(-1)?._id?.toString(),
     done: rows.length < BATCH_SIZE,
   };
@@ -124,9 +130,10 @@ export async function processResultEmailBatch(drawDispatchId: string, afterId?: 
 export async function getResultEmailDispatchStatus(drawDispatchId: string) {
   const recipients = await getResultEmailRecipientsCollection();
   const filter = { drawDispatchId: new ObjectId(drawDispatchId) };
-  const [failed, uncertain] = await Promise.all([
+  const [failed, uncertain, accepted] = await Promise.all([
     recipients.countDocuments({ ...filter, status: { $in: ["pending", "sending", "failed"] } }),
     recipients.countDocuments({ ...filter, status: "uncertain" }),
+    recipients.countDocuments({ ...filter, status: { $in: ["accepted", "delivered", "bounced", "delivery_failed"] } }),
   ]);
-  return { failed, uncertain };
+  return { failed, uncertain, accepted };
 }

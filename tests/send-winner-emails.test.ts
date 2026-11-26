@@ -182,6 +182,7 @@ describe("sendWinnerEmailsFunction", () => {
   });
 
   it("checkpoints bounded recipient batches and advances by record ID", async () => {
+    dispatchStatusMock.mockResolvedValueOnce({ accepted: 0 }).mockResolvedValue({ accepted: 6, failed: 0, uncertain: 0 });
     processBatchMock.mockResolvedValueOnce({ sent: 5, failed: 0, skipped: 0, uncertain: 0, lastId: "507f1f77bcf86cd799439011", done: false })
       .mockResolvedValueOnce({ sent: 1, failed: 0, skipped: 0, uncertain: 0, lastId: "507f1f77bcf86cd799439012", done: true });
     vi.resetModules();
@@ -192,11 +193,12 @@ describe("sendWinnerEmailsFunction", () => {
       event: { data: { orgId: "org_1", date: "2026-05-28", dispatchId: "507f1f77bcf86cd799439010" } },
       step,
     })).resolves.toMatchObject({ sent: 6, failed: 0 });
-    expect(step.run.mock.calls.map((call) => call[0])).toEqual(["result-email-batch-0", "result-email-batch-1", "result-email-completion"]);
+    expect(step.run.mock.calls.map((call) => call[0])).toEqual(["result-email-initial-status", "result-email-batch-0", "result-email-batch-1", "result-email-completion"]);
     expect(processBatchMock).toHaveBeenNthCalledWith(2, "507f1f77bcf86cd799439010", "507f1f77bcf86cd799439011");
   });
 
   it("retries failed recipients after checkpointing traversal", async () => {
+    dispatchStatusMock.mockResolvedValueOnce({ accepted: 3 }).mockResolvedValue({ accepted: 4, failed: 0, uncertain: 0 });
     processBatchMock.mockResolvedValueOnce({ sent: 0, failed: 1, skipped: 0, uncertain: 0, done: true })
       .mockResolvedValueOnce({ sent: 1, failed: 0, skipped: 0, uncertain: 0, done: true });
     vi.resetModules();
@@ -208,9 +210,9 @@ describe("sendWinnerEmailsFunction", () => {
     await expect(handler({
       event: { data: { orgId: "org_1", date: "2026-05-28", dispatchId: "507f1f77bcf86cd799439010" } },
       step,
-    })).resolves.toMatchObject({ sent: 1 });
+    })).resolves.toMatchObject({ sent: 1, skipped: 3 });
     expect(processBatchMock).toHaveBeenCalledTimes(2);
-    expect(step.run).toHaveBeenCalledTimes(3);
+    expect(step.run).toHaveBeenCalledTimes(4);
   });
 
   it("attempts all 11 recipients before signaling uncertainty", async () => {
@@ -227,7 +229,7 @@ describe("sendWinnerEmailsFunction", () => {
   });
 
   it("does not cache a failed retry as successful or block another failed batch", async () => {
-    dispatchStatusMock.mockResolvedValueOnce({ failed: 1, uncertain: 0 }).mockResolvedValue({ failed: 0, uncertain: 0 });
+    dispatchStatusMock.mockResolvedValueOnce({ accepted: 0 }).mockResolvedValueOnce({ failed: 1, uncertain: 0 }).mockResolvedValue({ failed: 0, uncertain: 0, accepted: 11 });
     const page = (lastId: string, done = false) => ({ sent: 4, failed: 1, skipped: 0, uncertain: 0, lastId, done });
     processBatchMock.mockResolvedValueOnce(page("first")).mockResolvedValueOnce(page("second"))
       .mockResolvedValueOnce({ sent: 1, failed: 0, skipped: 0, uncertain: 0, done: true })

@@ -1,3 +1,4 @@
+import { isLocalTestUri } from "../scripts/local-test-uri.mjs";
 import { randomUUID } from "node:crypto";
 import { MongoClient, ObjectId, type Db } from "mongodb";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -34,7 +35,7 @@ vi.mock("@/lib/mongodb", () => ({
 
 describe.skipIf(!uri)("real MongoDB draw and redemption", () => {
   beforeAll(async () => {
-    if (!/^mongodb:\/\/(127\.0\.0\.1|localhost):\d+\//.test(uri!)) throw new Error("A local test MongoDB URI is required");
+    if (!isLocalTestUri(uri)) throw new Error("A local test MongoDB URI is required");
     client = await MongoClient.connect(uri!);
     db = client.db(`ticket_farm_test_${randomUUID().replaceAll("-", "")}`);
     await db.collection("tickets").createIndex({ ticketId: 1 }, { unique: true });

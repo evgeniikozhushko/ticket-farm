@@ -1,7 +1,8 @@
+import { isLocalTestUri } from "./local-test-uri.mjs";
 import { MongoClient } from "mongodb";
 
 const uri = process.env.TICKET_FARM_TEST_MONGODB_URI;
-if (!uri || !/^mongodb:\/\/(127\.0\.0\.1|localhost):\d+\//.test(uri)) {
+if (!isLocalTestUri(uri)) {
   console.error("Release tests require TICKET_FARM_TEST_MONGODB_URI pointing to a disposable localhost MongoDB replica set. See RELEASE_CHECKS.md.");
   process.exit(1);
 }

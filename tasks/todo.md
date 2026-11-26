@@ -1,3 +1,17 @@
+# Dependency patch before beta — November 25, 2026
+
+- [x] Update next/eslint-config-next 16.3.8 → 16.4.6 (clears critical/high and moderate Next advisories) and zod → ^4.6.7.
+- [x] Refresh the systeminformation resolution under inngest (range ^5.31.6 already allows ≥5.33.16); lockfile now resolves 5.33.26.
+- [x] Re-run `pnpm audit:production`, then `pnpm check:release` against a disposable MongoDB replica set with the default (Turbopack) build.
+- [ ] After user-authorized commit/push: confirm the required CI check and run Preview multi-batch email recovery and signed webhook checks.
+
+### Verification — uncommitted candidate (seven review fixes + dependency patch)
+
+- `pnpm check:release` exited 0 with `TICKET_FARM_TEST_MONGODB_URI` on a disposable localhost MongoDB 8.0.14 replica set: lint, `tsc`, 36 files / 260 tests (no skips), audit and the default Next.js 16.4.6 Turbopack build all passed.
+- Production audit: 0 critical, 0 high; 2 moderate remain (glob, minimatch via inngest → @opentelemetry/auto-instrumentations-node → gcp-metadata → rimraf). Below the gate's `high` threshold; not addressed.
+- `next@16.0.1` remains in the lockfile only through the dev dependency `@react-email/preview-server`; it is not in the production audit scope.
+- Not yet verified: remote CI on the committed revision, and Preview email recovery/webhooks against real Inngest and Resend.
+
 # Latest Preview validation — October 3, 2026
 
 ## Execution plan — October 11, 2026
@@ -758,3 +772,19 @@ Remaining work is all dashboard-driven and must be performed in Vercel/Atlas/Cle
 
 - Production setup remains required: run the index setup, configure Resend to send signed events to `/api/webhooks/resend`, and set `RESEND_WEBHOOK_SECRET` in the deployment environment.
 - Delivery status reflects Resend's provider events. It does not establish that an email was read or reached the recipient's inbox.
+
+## Result-email review follow-up
+
+- [x] Recover live leases after traversal and count distinct recipient outcomes.
+- [x] Share localhost URI validation across release checks and integration tests.
+- [x] Correct message ordering, carousel cleanup, chart defaults and draw-panel refresh.
+- [x] Exercise regression scenarios, run release checks and review the diff.
+
+### Review of the seven findings
+
+- Added durable lease recovery and retry accounting based on recipient states before and after the run. Newer sends supersede older delivery outcomes for both winners and non-winners.
+- Shared localhost URI validation across preflight and all five database suites. Fixed carousel subscription cleanup, mobile chart initialization and draw-panel prop synchronization.
+- Lint and TypeScript passed. The slashless replica-set URI passed preflight and all 260 tests in 36 suites. The recovery tests used real MongoDB, simulated step replay and a mocked provider.
+- Fourteen URI checks passed. A temporary headless Chrome fixture verified client mount, hydration, manual chart selection, carousel effect replay and cleanup, and draw-panel refresh after a mocked draw.
+- The release gate stopped at the production audit with 15 advisories (2 critical, 3 high, 9 moderate, 1 low). A separate default build failed when Turbopack could not bind a worker port. The Webpack production build passed.
+- Reviewed the final diff and ran `git diff --check`. The existing readiness report and earlier checklist edits were preserved.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Card,
@@ -70,21 +70,14 @@ export function LotteryDrawPanel({
     string | undefined
   >();
 
-  useEffect(() => {
-    let active = true;
-
-    queueMicrotask(() => {
-      if (!active) return;
-      setStatus(initialStatus);
-      setWinners(initialWinners);
-      setLastDrawnAt(drawnAt);
-      setEmailDispatchError(undefined);
-    });
-
-    return () => {
-      active = false;
-    };
-  }, [initialStatus, initialWinners, drawnAt]);
+  const [previousDraw, setPreviousDraw] = useState({ initialStatus, initialWinners, drawnAt });
+  if (previousDraw.initialStatus !== initialStatus || previousDraw.initialWinners !== initialWinners || previousDraw.drawnAt !== drawnAt) {
+    setPreviousDraw({ initialStatus, initialWinners, drawnAt });
+    setStatus(initialStatus);
+    setWinners(initialWinners);
+    setLastDrawnAt(drawnAt);
+    setEmailDispatchError(undefined);
+  }
 
   const handleDraw = async () => {
     if (winnerCount <= 0) {

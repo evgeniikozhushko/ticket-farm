@@ -13,10 +13,12 @@ export async function syncResultEmailRecipient(record: ResultEmailRecipient) {
       : record.status === "delivery_failed"
         ? "failed"
         : undefined;
+  const acceptedAt = record.acceptedAt ?? record.createdAt;
+  const attemptAt = record.firstAttemptAt ?? acceptedAt;
   const set = success
     ? {
         emailSent: true,
-        emailSentAt: record.acceptedAt ?? new Date(),
+        emailSentAt: acceptedAt,
         ...(record.messageId ? { emailMessageId: record.messageId } : {}),
         ...(delivery ? { emailDelivery: delivery } : {}),
       }
@@ -34,14 +36,24 @@ export async function syncResultEmailRecipient(record: ResultEmailRecipient) {
       default: 0,
     },
   }] };
-  const ordering = success ? { $expr: { $or: [
+  const sameMessageOrder = { $or: [
     { $lt: [storedRank, rank] },
     { $and: [
       { $eq: [storedRank, rank] },
       { $lte: [{ $ifNull: [`$${prefix}DeliveryAt`, new Date(0)] }, deliveryAt] },
     ] },
+  ] };
+  const storedId = { $ifNull: [`$${prefix}MessageId`, null] };
+  const storedAttempt = { $ifNull: [`$${prefix}AttemptAt`, `$${prefix}SentAt`] };
+  // Rank events within one message. A replacement send must have started later.
+  const ordering = success ? { $expr: { $cond: [
+    { $and: [record.messageId != null, { $ne: [storedId, null] }, { $ne: [storedId, record.messageId ?? null] }] },
+    { $lt: [{ $ifNull: [storedAttempt, new Date(0)] }, attemptAt] },
+    { $and: [{ $or: [record.messageId != null, { $eq: [storedId, null] }] }, sameMessageOrder] },
   ] } } : {};
+  const unset: Record<string, ""> = { [`${prefix}Error`]: "", ...(!delivery ? { [`${prefix}Delivery`]: "" } : {}) };
   const metadata = success ? {
+    [`${prefix}AttemptAt`]: attemptAt,
     [`${prefix}DeliveryRank`]: rank,
     [`${prefix}DeliveryAt`]: deliveryAt,
   } : {};
@@ -50,14 +62,14 @@ export async function syncResultEmailRecipient(record: ResultEmailRecipient) {
     await tickets.updateOne(
       { orgId: record.orgId, date: record.date, ticketId: record.recipientId,
         ...ordering, ...(success ? {} : { emailSent: { $ne: true } }) },
-      success ? { $set: { ...set, ...metadata }, $unset: { emailError: "" } } : { $set: set }
+      success ? { $set: { ...set, ...metadata }, $unset: unset } : { $set: set }
     );
   } else {
     const registrants = await getRegistrantsCollection();
     const nonWinnerSet = success
       ? {
           nonWinnerEmailSent: true,
-          nonWinnerEmailSentAt: record.acceptedAt ?? new Date(),
+          nonWinnerEmailSentAt: acceptedAt,
           ...(record.messageId ? { nonWinnerEmailMessageId: record.messageId } : {}),
           ...(delivery ? { nonWinnerEmailDelivery: delivery } : {}),
         }
@@ -65,7 +77,7 @@ export async function syncResultEmailRecipient(record: ResultEmailRecipient) {
     await registrants.updateOne(
       { orgId: record.orgId, date: record.date, _id: new ObjectId(record.recipientId),
         ...ordering, ...(success ? {} : { nonWinnerEmailSent: { $ne: true } }) },
-      success ? { $set: { ...nonWinnerSet, ...metadata }, $unset: { nonWinnerEmailError: "" } } : { $set: nonWinnerSet }
+      success ? { $set: { ...nonWinnerSet, ...metadata }, $unset: unset } : { $set: nonWinnerSet }
     );
   }
 }

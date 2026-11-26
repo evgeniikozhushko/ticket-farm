@@ -142,7 +142,7 @@ const chartConfig = {
 
 export function ChartAreaInteractive() {
   const isMobile = useIsMobile()
-  const [timeRange, setTimeRange] = React.useState("90d")
+  const [timeRange, setTimeRange] = React.useState(isMobile ? "7d" : "90d")
   const [previousIsMobile, setPreviousIsMobile] = React.useState(isMobile)
 
   if (isMobile !== previousIsMobile) {
