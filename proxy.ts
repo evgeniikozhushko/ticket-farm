@@ -1,25 +1,21 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
-const isProtectedRoute = createRouteMatcher([
-  "/dashboard(.*)",
-  "/admin(.*)",
-  "/org(.*)",
-  "/billing(.*)",
-  "/onboarding(.*)",
-  "/checkin(.*)",
-  "/analytics(.*)",
-  "/platform(.*)",
-]);
+const orgRequiredRoutes = [
+  "/dashboard", "/dashboard/(.*)",
+  "/admin", "/admin/(.*)",
+  "/org", "/org/(.*)",
+  "/billing", "/billing/(.*)",
+  "/checkin", "/checkin/(.*)",
+  "/analytics", "/analytics/(.*)",
+];
 
-const isOrgRequiredRoute = createRouteMatcher([
-  "/dashboard(.*)",
-  "/admin(.*)",
-  "/org(.*)",
-  "/billing(.*)",
-  "/checkin(.*)",
-  "/analytics(.*)",
+const isProtectedRoute = createRouteMatcher([
+  ...orgRequiredRoutes,
+  "/onboarding", "/onboarding/(.*)",
+  "/platform", "/platform/(.*)",
 ]);
+const isOrgRequiredRoute = createRouteMatcher(orgRequiredRoutes);
 
 export default clerkMiddleware(async (auth, req) => {
   if (isProtectedRoute(req)) {

@@ -485,21 +485,25 @@ export function LotteryDrawPanel({
         )}
         {isAdmin && (
           <div className="mt-6 flex flex-wrap items-end gap-3 border-t pt-5">
-            <div className="space-y-2">
-              <Label htmlFor="retry-result-date">Retry result emails for draw date</Label>
-              <Input
-                id="retry-result-date"
-                type="date"
-                value={retryDate}
-                onChange={(event) => setRetryDate(event.target.value)}
-                className="w-auto"
-              />
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="retry-result-date">Retry result emails for draw date</Label>
+                <Input
+                  id="retry-result-date"
+                  type="date"
+                  value={retryDate}
+                  onChange={(event) => setRetryDate(event.target.value)}
+                  className="w-auto"
+                />
+              </div>
+              <Button type="button" variant="outline" onClick={handleRetryEmails} disabled={isRetryingEmails}>
+                {isRetryingEmails ? <IconLoader className="mr-2 size-4 animate-spin" /> : <IconRefresh className="mr-2 size-4" />}
+                Retry unsent result emails
+              </Button>
+            </div>
+            <div className="basis-full">
               <p className="text-xs text-muted-foreground">Leave blank for today.</p>
             </div>
-            <Button type="button" variant="outline" onClick={handleRetryEmails} disabled={isRetryingEmails}>
-              {isRetryingEmails ? <IconLoader className="mr-2 size-4 animate-spin" /> : <IconRefresh className="mr-2 size-4" />}
-              Retry unsent result emails
-            </Button>
           </div>
         )}
       </CardContent>

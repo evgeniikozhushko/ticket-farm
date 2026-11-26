@@ -30,7 +30,7 @@ export function TicketRedemptionPanel() {
   }
 
   return (
-    <Card>
+    <Card className="mx-4 min-w-0 lg:mx-6">
       <CardHeader>
         <CardTitle>Ticket pickup</CardTitle>
         <CardDescription>Ask the winner for their private Reference. A ticket number alone cannot be redeemed.</CardDescription>

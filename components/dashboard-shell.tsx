@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { getOrganization } from "@/lib/orgs";
 
 const dashboardShellStyle = {
   "--sidebar-width": "calc(var(--spacing) * 72)",
@@ -15,11 +16,13 @@ type DashboardShellProps = {
 };
 
 export async function DashboardShell({ title, children }: DashboardShellProps) {
-  const { orgRole } = await auth();
+  const { orgId, orgRole } = await auth();
+  const org = orgId ? await getOrganization(orgId) : null;
+  const publicSlug = org?.publicPageEnabled ? org.slug : null;
 
   return (
     <SidebarProvider style={dashboardShellStyle}>
-      <AppSidebar variant="inset" isAdmin={orgRole === "org:admin"} />
+      <AppSidebar variant="inset" isAdmin={orgRole === "org:admin"} publicSlug={publicSlug} />
       <SidebarInset>
         <SiteHeader title={title} />
         {children}

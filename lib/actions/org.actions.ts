@@ -1,6 +1,7 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
+import { revalidatePath } from "next/cache";
 import { getOrganizationsCollection } from "@/lib/mongodb";
 import { requireRole } from "@/lib/authz";
 import { isDuplicateKeyError } from "@/lib/mongo-errors";
@@ -213,5 +214,6 @@ export async function updateOrganizationSettings(
     throw err;
   }
 
+  revalidatePath("/org/settings");
   return { success: true };
 }

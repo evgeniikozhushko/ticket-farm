@@ -33,6 +33,12 @@ Date: October 11, 2026 (America/Edmonton).
 
 ## Live-access result
 
+Previously completed live checks remain valid historical evidence: September 30
+verified Preview connectivity, restricted database access, required indexes and
+the core registration/draw/email/redemption workflow; October 3 confirmed Preview
+database isolation and registration-disable/quota scenarios on `84af0d0`.
+The access limitation below applies to new checks and does not revoke those passes.
+
 The immutable Preview URL recorded on October 3 responds from Vercel but redirects
 to Vercel Authentication. The response directs authenticated access through the
 Vercel CLI or an authorized Vercel MCP connection. Neither is available in this
@@ -50,3 +56,16 @@ gate and repeat every environment-dependent check against that new revision.
 No Vercel, Atlas, Clerk, Inngest, Resend, Stripe, GitHub, or Production setting
 was changed. No test email, webhook, draw, deletion, shutdown, restore, or
 Production deployment was performed.
+
+## Follow-up on committed candidate `e1c6be2`
+
+The user committed the changes as `e1c6be2`. A fresh disposable MongoDB 8.0.16
+replica set bound to localhost ran all 36 test files / 255 tests with no skips.
+`pnpm check:release` passed lint, types, tests and the production audit (no known
+vulnerabilities), then failed at the standard Turbopack build because its worker
+could not bind a port. The complete release command therefore remains unpassed;
+the final code has the separately recorded passing Webpack build.
+
+This run used only randomized disposable local test databases, with provider sends
+mocked by the suites. Remote CI and branch protection remain unverified. The local
+MongoDB process was stopped after testing; its temporary data was retained.
