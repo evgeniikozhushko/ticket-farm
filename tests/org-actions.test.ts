@@ -7,10 +7,13 @@ const organizationsCollection = vi.hoisted(() => ({
 }));
 const requireRoleMock = vi.hoisted(() => vi.fn());
 const authMock = vi.hoisted(() => vi.fn());
+const revalidatePathMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@clerk/nextjs/server", () => ({
   auth: authMock,
 }));
+
+vi.mock("next/cache", () => ({ revalidatePath: revalidatePathMock }));
 
 vi.mock("@/lib/mongodb", () => ({
   getOrganizationsCollection: vi.fn(() =>
@@ -297,6 +300,7 @@ describe("updateOrganizationSettings", () => {
         },
       },
     );
+    expect(revalidatePathMock).toHaveBeenCalledExactlyOnceWith("/org/settings");
   });
 
   it("rejects empty, too-short, too-long, and reserved slugs without writing", async () => {
@@ -426,5 +430,6 @@ describe("updateOrganizationSettings", () => {
       success: false,
       error: "This slug is already in use. Please choose another.",
     });
+    expect(revalidatePathMock).not.toHaveBeenCalled();
   });
 });

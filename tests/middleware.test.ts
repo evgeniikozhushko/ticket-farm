@@ -23,6 +23,8 @@ describe("middleware", () => {
   });
 
   it.each([
+    "/dashboard/lottery",
+    "/org/settings",
     "/%64ashboard/lottery",
     "/dashboard//lottery",
     "/%6frg/settings",
@@ -51,11 +53,11 @@ describe("middleware", () => {
     expect(protectMock).toHaveBeenCalledOnce();
   });
 
-  it("allows public routes without auth protection", async () => {
+  it.each(["/public-org", "/org-demo", "/dashboard-tickets"])("allows public route %s without auth protection", async (pathname) => {
     const { default: middleware } = await import("@/proxy");
 
     const result = await (middleware as unknown as (req: { url: string }) => Promise<unknown>)({
-      url: "https://ticketfarm.test/public-org",
+      url: `https://ticketfarm.test${pathname}`,
     });
 
     expect(result).toBeUndefined();

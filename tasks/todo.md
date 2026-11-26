@@ -1,9 +1,53 @@
+# Dashboard UI — sidebar cleanup (branch feat/dashboard-ui) — November 25, 2026
+
+- [x] Removed template "Quick Create" button and dead Inbox icon (no handlers) from `components/nav-main.tsx`.
+- [x] Main nav items (Lottery, Participants, Analytics) now render as `next/link` links; previously they were plain buttons and did nothing. Analytics remains a `#` placeholder.
+- [x] "Ticket Farm" sidebar header links to `/dashboard` (redirects to `/dashboard/lottery`).
+- Verification: `tsc --noEmit` and eslint on changed files clean. Not yet clicked through in a signed-in browser session.
+
+# Dashboard UI — sidebar round 2 (branch feat/dashboard-ui)
+
+- [x] Review sidebar navigation, organization lookup, settings save, and public route matching.
+- [x] Highlight internal navigation, set `aria-current` on exact matches, use `Link` for Settings and Billing, and close the mobile sheet from sidebar links and the header.
+- [x] Show the enabled public page for members and admins, preserve admin navigation, and refresh the link after Settings saves.
+- [x] Match protected route segments so prefixed organization slugs can load their public pages.
+- [x] Update sidebar, settings action, and middleware regression tests.
+- [x] Run TypeScript, targeted lint and tests, and the full suite.
+- [x] Verify signed-out public routes in the dev server.
+- [ ] Verify signed-in desktop and mobile flows in the dev server. Computer Use permissions blocked the browser check.
+- [x] Review the implementation and test diff.
+
+## Review
+
+- Navigation marks the current page, closes the mobile sheet on link clicks, and uses client-side links for Settings and Billing.
+- Members and admins get a new-tab registration link when the public page is enabled. Settings saves revalidate the sidebar, and Clerk route matching uses complete path segments.
+- `npx tsc --noEmit`, ESLint on all nine changed TypeScript files, and the three targeted test files passed. The full suite passed all 277 tests across 36 files against a disposable local MongoDB replica set.
+- The isolated dev server rendered the registration form with HTTP 200 for signed-out requests to `/example-club`, `/org-demo`, and `/dashboard-tickets`. `/org/settings` and `/dashboard/lottery` returned HTTP 307 redirects to sign-in.
+
 # Dependency patch before beta — November 25, 2026
 
 - [x] Update next/eslint-config-next 16.3.8 → 16.4.6 (clears critical/high and moderate Next advisories) and zod → ^4.6.7.
 - [x] Refresh the systeminformation resolution under inngest (range ^5.31.6 already allows ≥5.33.16); lockfile now resolves 5.33.26.
 - [x] Re-run `pnpm audit:production`, then `pnpm check:release` against a disposable MongoDB replica set with the default (Turbopack) build.
-- [ ] After user-authorized commit/push: confirm the required CI check and run Preview multi-batch email recovery and signed webhook checks.
+- [x] Commit and push the candidate: `3be0fe44cb52691cdb9e5b7e2dbe2722990c7d2b` on `chore/beta-launch-readiness`; PR #13 opened against `main`.
+- [x] CI `Release checks` run 45736386778 on `3be0fe4`: success — 36 files / 260 tests, audit 0 high/critical, Next.js 16.4.6 Turbopack build.
+- [x] Branch protection: active ruleset 28125947 "main: require PR and release check" (pull request + `release` from GitHub Actions, no bypass actors). PR #13 lists `release` as required and passing; PR remains open. Pre-existing disabled ruleset `protect-branch` left unchanged.
+- [x] Preview automation bypass: the existing "Ticket Farm Preview Providers" bypass is used (secret not recorded). A duplicate bypass created by mistake during setup was revoked.
+- [x] Unsigned POST through the bypass to `/api/webhooks/resend` on `dpl_67T5dJTVvRUCt5r3rZM68KZBzBwa` returned the app's `400 {"error":"Invalid signature"}`.
+- [x] Inngest showed the branch app synced to deployment `dpl_67T5dJTVvRUCt5r3rZM68KZBzBwa` on commit `3be0fe4`.
+- [x] The owner confirmed rotation of the "Ticket Farm Preview Providers" automation bypass.
+- [x] The Inngest branch app re-sync succeeded after applying the rotated bypass.
+- [x] Resend confirmed the existing Preview webhook endpoint was updated to the immutable deployment with the rotated bypass.
+- [ ] 12-recipient draw (11 `delivered+…`, 1 `bounced+…`, all winners): 3 batch steps, `sent: 12`, one message ID per address, delivered/bounced webhooks 200, bounced recipient shown in the refreshed winner panel. Record Inngest run ID.
+- [ ] Replay: fresh run on the same dispatch ID returns `sent: 0, skipped: 12`, no new provider messages. Record run ID.
+- [ ] Live lease recovery: record as unexercised unless a recipient is observed `sending` with an active claim; crash recovery covered by the MongoDB integration test.
+
+### Preview access verification
+
+- [x] GitHub Preview deployment `8074025332` for `3be0fe44cb52691cdb9e5b7e2dbe2722990c7d2b` reports success at `ticket-farm-a0slfc3s9-evgeniis-projects-797be76f.vercel.app`.
+- Owner-reported live draw run `01M8AW25EPMHS354VJD16M3E5H`, dispatch `6b079df82a0b97504d57f045`: sent 2, skipped 0, failed 0, uncertain 0. Batch step count remains unverified.
+- The owner confirmed that rerun `01M8AWQYFMD1RKZT1GCX5FGM56` used the same dispatch ID and returned 0 sent, 2 skipped, 0 failed and 0 uncertain. Resend still showed only the two original messages after the rerun. The two-recipient duplicate-send check passed.
+- Owner-reported Resend delivery event `msg_3Mcshg0m8zq1Bmk0b8LJngOq8tj` for email ID `01a215c1-240c-7e84-9539-3de2cb1c05f2`: HTTP 200 on attempt 1 at `2026-11-26T02:48:30.608Z`, response `{"received":true}`.
 
 ### Verification — uncommitted candidate (seven review fixes + dependency patch)
 
@@ -17,6 +61,7 @@
 ## Execution plan — October 11, 2026
 
 - [ ] Re-verify the committed candidate's automated release gate with a disposable MongoDB replica set and record exact evidence.
+- [x] Run the full database suite on committed candidate `e1c6be2`: 36 files / 255 tests / no skips; lint, types and production audit passed. Standard build remains blocked by local Turbopack worker-port permissions.
 - [x] Remediate the newly discovered production-audit dependency advisories, then repeat the audit and static/build verification.
 - [x] Add the local CI workflow for the release gate.
 - [ ] Verify its first remote run and required branch protection after commit/push.
@@ -42,7 +87,13 @@ User authorized implementation of the approved free-beta readiness plan on Octob
 
 ### Remaining blockers
 
-- Commit and deploy the new candidate, then validate the replica-set suite, first remote CI run/branch protection, all Preview R5 gates, Production configuration, and the R6/R7 operating drills.
+- Candidate changes are committed as `e1c6be2`. Validate its first remote CI run/branch protection, the remaining Preview R5 gates, Production configuration, and R6/R7 operating drills. The database integration suite is now verified; standard build still requires remote confirmation.
+
+### Follow-up verification — committed candidate
+
+- Disposable localhost MongoDB 8.0.16 replica set: all 255 tests passed without skips on `e1c6be2`; external sends were mocked by the suites.
+- `pnpm check:release` passed lint, types, tests and audit, then stopped at the local Turbopack worker-port restriction. The command as a whole is not marked passed.
+- Prior Preview connectivity/index and core workflow passes from September 30, plus isolation, registration-disable and quota passes from October 3, remain completed evidence. Their absence from the latest agent run does not invalidate them.
 
 ## Approved plan
 
@@ -68,6 +119,7 @@ This is the current checklist for continuing Production readiness. Existing appl
 
 ## Checklist
 
+- [x] Preview database connectivity, restricted application-user access and required indexes — September 30 report; Preview database isolation reconfirmed October 3.
 - [ ] Record the exact Preview deployment URL/ID and source revision; confirm its isolated database and provider settings before testing.
 - [x] Validate live Preview registration: stale-form rejection, unchanged registration/counter values and immediate admission after re-enabling — user-confirmed manual pass on `84af0d0`; see October 3 report.
 - [x] Validate the live quota boundary: cap 100 rejects entry 101, cap 250 admits immediately, restored cap 100 rejects further admissions and preserves entries — user-confirmed manual pass on `84af0d0`; see October 3 report.
@@ -788,3 +840,51 @@ Remaining work is all dashboard-driven and must be performed in Vercel/Atlas/Cle
 - Fourteen URI checks passed. A temporary headless Chrome fixture verified client mount, hydration, manual chart selection, carousel effect replay and cleanup, and draw-panel refresh after a mocked draw.
 - The release gate stopped at the production audit with 15 advisories (2 critical, 3 high, 9 moderate, 1 low). A separate default build failed when Turbopack could not bind a worker port. The Webpack production build passed.
 - Reviewed the final diff and ran `git diff --check`. The existing readiness report and earlier checklist edits were preserved.
+
+# Blank production sign-in — proposed configuration fix review
+
+## Investigation
+
+- [x] Inspect middleware, sign-in, onboarding, organization provisioning and authorization.
+- [x] Read public production Clerk environment: force_organization_selection is true.
+- [x] Run targeted tests: 3 files, 26 tests passed.
+
+## Proposed implementation — awaiting approval
+
+- [ ] Disable Production Membership required (allow personal accounts).
+- [ ] Verify fresh signup → onboarding → org creation → dashboard, then sign-out/sign-in, and recovery for an already affected session.
+- [ ] Record the verified setting and result in BETA_DEPLOY_CHECKLIST.md.
+
+## Review
+
+- Configuration-only fix is consistent with existing app guards and provisioning. No application code or production settings changed during review.
+- Clerk documents pending sessions as signed out by default; the exact browser blank-screen mechanism has not been reproduced.
+- Middleware and org-setup tests cover no-org behavior; onboarding-page tests cover only needs-admin and ok, and mock CreateOrganization. These tests do not verify Clerk session-task behavior.
+- Production end-to-end verification remains required. Existing unrelated working-tree changes preserved.
+
+# Durable authentication and organization onboarding — renewed review
+
+## Findings (2026-11-25)
+
+- Production public Clerk environment still reports force_organization_selection=true.
+- Installed @clerk/nextjs is 6.39.6. Current Clerk docs describe built-in SignIn/SignUp session-task handling; the setting alone does not establish a blank-screen root cause.
+- App onboarding is protected by auth.protect(), so a pending session cannot reach its no-org branch.
+- No active org currently always renders CreateOrganization; existing memberships are not offered for selection on that page.
+- Targeted middleware, onboarding, org-setup, sign-up and authz tests: 5 files / 35 tests passed. They mock authentication and do not reproduce production session transitions.
+
+## Proposed plan — awaiting approval; supersedes configuration-only plan
+
+- [ ] Reproduce with a controlled account and production-equivalent Clerk configuration. Capture sanitized redirect chain, session status/task keys, active org, browser errors and deployed SDK/redirect settings. Verify whether the failure occurs before creation, after creation but before activation, or during app provisioning.
+- [ ] Adopt app-owned organization onboarding: Clerk owns authentication and other required session tasks; the app owns org selection/creation and Mongo readiness. Allow personal accounts in Clerk once this flow has passed staging acceptance. Keep org authorization enforced on the server.
+- [ ] Extend existing onboarding to offer existing memberships for selection, with creation available when allowed. Await successful Clerk org activation before proceeding to provisioning. Preserve existing admin-only/idempotent provisioning and member waiting state.
+- [ ] Align sign-in/sign-up redirect configuration with supported fallback/force options. Preserve valid protected-route return destinations and send no-org users through onboarding. Use installed-SDK-supported task handling if reproduction exposes a pending-session handling defect; do not globally treat pending sessions as authenticated.
+- [ ] Provide visible loading, retry and sign-out recovery for auth/onboarding failures; log sanitized transition/failure details without tokens or personal data.
+- [ ] Add focused regression tests for sign-in state routing and onboarding creation/selection. Run real Clerk browser acceptance for fresh signup, returning member without active org, multiple orgs, invited non-admin, stale session, reload, provisioning failure and unauthorized direct route/action access.
+- [ ] Roll out the verified setting and code together, verify an already affected session and fresh production signup/sign-in, and document expected settings plus a configuration check in BETA_DEPLOY_CHECKLIST.md.
+- [ ] Run relevant checks and review the final diff.
+
+## Review
+
+- Investigation and plan only; no production settings or application code changed. Existing work preserved.
+- Blank-screen symptom has not been independently reproduced with an authenticated account. Root cause remains a hypothesis pending browser/session evidence.
+- A Clerk-owned required-org flow is also valid, but would require adapting onboarding to that ownership model. App-owned onboarding best matches the existing implementation and platform-admin access without an org.

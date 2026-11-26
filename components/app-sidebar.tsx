@@ -1,8 +1,10 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import {
   IconChartBar,
+  IconExternalLink,
   IconListDetails,
   IconSettings,
   IconTicket,
@@ -20,6 +22,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar"
 
 const data = {
@@ -54,7 +57,26 @@ const data = {
   ],
 }
 
-export function AppSidebar({ isAdmin, ...props }: React.ComponentProps<typeof Sidebar> & { isAdmin: boolean }) {
+export function AppSidebar({
+  isAdmin,
+  publicSlug,
+  ...props
+}: React.ComponentProps<typeof Sidebar> & { isAdmin: boolean; publicSlug?: string | null }) {
+  const { setOpenMobile } = useSidebar()
+  const secondaryItems: React.ComponentProps<typeof NavSecondary>["items"] = []
+
+  if (publicSlug) {
+    secondaryItems.push({
+      title: "Public page",
+      url: `/${publicSlug}`,
+      icon: IconExternalLink,
+      external: true,
+    })
+  }
+  if (isAdmin) {
+    secondaryItems.push(...data.navSecondary)
+  }
+
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
@@ -64,17 +86,17 @@ export function AppSidebar({ isAdmin, ...props }: React.ComponentProps<typeof Si
               asChild
               className="data-[slot=sidebar-menu-button]:!p-1.5"
             >
-              <a href="#">
+              <Link href="/dashboard" onClick={() => setOpenMobile(false)}>
                 <IconTicket className="!size-5" />
                 <span className="text-base font-semibold">Ticket Farm</span>
-              </a>
+              </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} />
-        {isAdmin && <NavSecondary items={data.navSecondary} className="mt-auto" />}
+        {secondaryItems.length > 0 && <NavSecondary items={secondaryItems} className="mt-auto" />}
       </SidebarContent>
       <SidebarFooter>
         <NavUser />
