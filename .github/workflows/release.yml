@@ -1,0 +1,69 @@
+name: Release checks
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      mongo:
+        image: mongo:8.2
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+        command: --replSet ticketfarmtest --bind_ip_all
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Initialize MongoDB replica set
+        env:
+          MONGO_CONTAINER: ${{ job.services.mongo.id }}
+        run: |
+          docker exec "$MONGO_CONTAINER" mongosh --quiet \
+            'mongodb://localhost:27017/?directConnection=true' \
+            --eval 'rs.initiate({_id:"ticketfarmtest",members:[{_id:0,host:"localhost:27017"}]})'
+
+          for attempt in {1..60}; do
+            if docker exec "$MONGO_CONTAINER" mongosh --quiet \
+            'mongodb://localhost:27017/?directConnection=true' \
+            --eval 'db.hello().isWritablePrimary' | grep -qx true; then
+              exit 0
+            fi
+            sleep 1
+          done
+          exit 1
+
+      - name: Run release checks
+        env:
+          TICKET_FARM_TEST_MONGODB_URI: mongodb://127.0.0.1:27017/?replicaSet=ticketfarmtest
+          MONGODB_URI: mongodb://127.0.0.1:27017/?replicaSet=ticketfarmtest
+          MONGODB_DB_NAME: ticket_farm_ci
+          APP_URL: http://localhost:3000
+          RESEND_API_KEY: re_ci_placeholder
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_Y2xlcmsuZXhhbXBsZS5jb20k
+        run: pnpm check:release

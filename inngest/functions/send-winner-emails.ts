@@ -2,7 +2,7 @@ import { inngest } from "@/inngest/client";
 import { sendBulkWinnerEmails, type EmailTicket, type NonWinnerEmail } from "@/lib/email";
 import { sendNonWinnerNotifications } from "@/lib/non-winner-notifications";
 import { getTicketsCollection } from "@/lib/mongodb";
-import { processResultEmailBatch } from "@/lib/result-email-delivery";
+import { getResultEmailDispatchStatus, processResultEmailBatch } from "@/lib/result-email-delivery";
 import type { Ticket } from "@/lib/types";
 import type { AnyBulkWriteOperation } from "mongodb";
 
@@ -79,26 +79,49 @@ export const sendWinnerEmailsFunction = inngest.createFunction(
     if (dispatchId) {
       let afterId: string | undefined;
       let batch = 0;
-      const totals = { sent: 0, failed: 0, skipped: 0, uncertain: 0 };
+      const initial = await step.run("result-email-initial-status", () => getResultEmailDispatchStatus(dispatchId));
+      const retryBatches: { cursor?: string; batch: number; leaseUntil?: number }[] = [];
       while (true) {
-        const result = await step.run(`result-email-batch-${batch++}`, async () => {
-          const outcome = await processResultEmailBatch(dispatchId, afterId);
-          if (outcome.failed || outcome.uncertain) {
-            throw new Error(`${outcome.failed} result emails failed; ${outcome.uncertain} need provider reconciliation.`);
-          }
-          return outcome;
-        });
-        totals.sent += result.sent;
-        totals.failed += result.failed;
-        totals.skipped += result.skipped;
-        totals.uncertain += result.uncertain;
+        const cursor = afterId;
+        const batchNumber = batch++;
+        // Checkpoint traversal separately from retries so every eligible recipient
+        // gets an attempt before an unresolved batch can fail the job.
+        const result = await step.run(`result-email-batch-${batchNumber}`, () =>
+          processResultEmailBatch(dispatchId, cursor)
+        );
+        if (result.failed || result.leaseUntil) {
+          retryBatches.push({ cursor, batch: batchNumber, leaseUntil: result.leaseUntil });
+        }
         if (result.done) break;
         afterId = result.lastId;
       }
-      if (totals.failed || totals.uncertain) {
-        throw new Error(`${totals.failed} result emails failed; ${totals.uncertain} need provider reconciliation.`);
+      for (const retry of retryBatches) {
+        let leaseUntil = retry.leaseUntil;
+        let pass = 0;
+        do {
+          const id = pass === 0 ? `result-email-retry-${retry.batch}` : `result-email-retry-${retry.batch}-${pass}`;
+          if (leaseUntil) await step.sleepUntil(`${id}-lease`, new Date(leaseUntil));
+          try {
+            const result = await step.run(id, async () => {
+              const outcome = await processResultEmailBatch(dispatchId, retry.cursor);
+              if (outcome.failed && !outcome.leaseUntil) throw new Error(`${outcome.failed} result emails failed.`);
+              return outcome;
+            });
+            leaseUntil = result.leaseUntil;
+          } catch {
+            // After step retries, still attempt recovery for other batches.
+            break;
+          }
+          pass++;
+        } while (leaseUntil);
       }
-      return totals;
+      return await step.run("result-email-completion", async () => {
+        const outstanding = await getResultEmailDispatchStatus(dispatchId);
+        if (outstanding.failed || outstanding.uncertain) {
+          throw new Error(`${outstanding.failed} result emails failed or pending; ${outstanding.uncertain} need provider reconciliation.`);
+        }
+        return { sent: outstanding.accepted - initial.accepted, skipped: initial.accepted, failed: 0, uncertain: 0 };
+      });
     }
     const totals = { sent: 0, failed: 0, skipped: 0 };
     let winnerFailures = 0;

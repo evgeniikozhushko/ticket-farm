@@ -1,61 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { ObjectId } from "mongodb";
 import { sendNonWinnerEmail, sendWinnerEmail } from "@/lib/email";
-import {
-  getRegistrantsCollection,
-  getResultEmailRecipientsCollection,
-  getTicketsCollection,
-} from "@/lib/mongodb";
-import type { ResultEmailRecipient } from "@/lib/types";
+import { getResultEmailRecipientsCollection } from "@/lib/mongodb";
+import { syncResultEmailRecipient } from "@/lib/result-email-status";
 
 const BATCH_SIZE = 5;
 const LEASE_MS = 5 * 60 * 1000;
 const IDEMPOTENCY_MS = 23 * 60 * 60 * 1000;
 const MAX_ATTEMPTS = 10;
 
-async function syncRecipient(record: ResultEmailRecipient) {
-  if (record.status !== "accepted" && record.status !== "delivered" &&
-      record.status !== "bounced" && record.status !== "delivery_failed" && record.status !== "failed") return;
-  const success = record.status !== "failed";
-  const delivery: "delivered" | "bounced" | "failed" | undefined = record.status === "delivered"
-    ? "delivered"
-    : record.status === "bounced"
-      ? "bounced"
-      : record.status === "delivery_failed"
-        ? "failed"
-        : undefined;
-  const set = success
-    ? {
-        emailSent: true,
-        emailSentAt: record.acceptedAt ?? new Date(),
-        ...(record.messageId ? { emailMessageId: record.messageId } : {}),
-        ...(delivery ? { emailDelivery: delivery } : {}),
-      }
-    : { emailSent: false, emailError: record.lastError ?? "Email send failed." };
-  if (record.kind === "winner") {
-    const tickets = await getTicketsCollection();
-    await tickets.updateOne(
-      { orgId: record.orgId, date: record.date, ticketId: record.recipientId,
-        ...(success ? {} : { emailSent: { $ne: true } }) },
-      success ? { $set: set, $unset: { emailError: "" } } : { $set: set }
-    );
-  } else {
-    const registrants = await getRegistrantsCollection();
-    const nonWinnerSet = success
-      ? {
-          nonWinnerEmailSent: true,
-          nonWinnerEmailSentAt: record.acceptedAt ?? new Date(),
-          ...(record.messageId ? { nonWinnerEmailMessageId: record.messageId } : {}),
-          ...(delivery ? { nonWinnerEmailDelivery: delivery } : {}),
-        }
-      : { nonWinnerEmailSent: false, nonWinnerEmailError: record.lastError ?? "Email send failed." };
-    await registrants.updateOne(
-      { orgId: record.orgId, date: record.date, _id: new ObjectId(record.recipientId),
-        ...(success ? {} : { nonWinnerEmailSent: { $ne: true } }) },
-      success ? { $set: nonWinnerSet, $unset: { nonWinnerEmailError: "" } } : { $set: nonWinnerSet }
-    );
-  }
-}
 
 export async function processResultEmailBatch(drawDispatchId: string, afterId?: string) {
   const recipients = await getResultEmailRecipientsCollection();
@@ -68,7 +21,7 @@ export async function processResultEmailBatch(drawDispatchId: string, afterId?: 
   for (const row of rows) {
     if (!row._id) throw new Error("Email recipient is missing its ID.");
     if (["accepted", "delivered", "bounced", "delivery_failed"].includes(row.status)) {
-      await syncRecipient(row);
+      await syncResultEmailRecipient(row);
       counts.skipped++;
       continue;
     }
@@ -77,9 +30,13 @@ export async function processResultEmailBatch(drawDispatchId: string, afterId?: 
       counts.uncertain++;
       continue;
     }
+    if (row.status === "sending" && row.claimedAt && row.claimedAt.getTime() + LEASE_MS > now.getTime()) {
+      counts.skipped++;
+      continue;
+    }
     if (row.attempts >= MAX_ATTEMPTS) {
       await recipients.updateOne(
-        { _id: row._id, status: row.status, attempts: { $gte: MAX_ATTEMPTS } },
+        { _id: row._id, status: row.status, ...(row.claimToken ? { claimToken: row.claimToken } : {}), attempts: { $gte: MAX_ATTEMPTS } },
         { $set: { status: "uncertain", updatedAt: now, lastError: "Email attempts exhausted; reconcile with Resend." },
           $unset: { claimToken: "" } }
       );
@@ -96,10 +53,6 @@ export async function processResultEmailBatch(drawDispatchId: string, afterId?: 
       continue;
     }
     if ((row.status === "sending" || row.status === "failed") && row.claimedAt) {
-      if (row.status === "sending" && row.claimedAt.getTime() > now.getTime() - LEASE_MS) {
-        counts.skipped++;
-        continue;
-      }
       if (row.claimedAt.getTime() <= now.getTime() - IDEMPOTENCY_MS) {
         await recipients.updateOne(
           { _id: row._id, status: row.status, ...(row.claimToken ? { claimToken: row.claimToken } : {}) },
@@ -116,7 +69,7 @@ export async function processResultEmailBatch(drawDispatchId: string, afterId?: 
         _id: row._id,
         $or: [
           { status: { $in: ["pending", "failed"] } },
-          { status: "sending", claimedAt: { $lt: new Date(now.getTime() - LEASE_MS) } },
+          { status: "sending", claimedAt: { $lte: new Date(now.getTime() - LEASE_MS) } },
         ],
       },
       [{ $set: {
@@ -156,13 +109,31 @@ export async function processResultEmailBatch(drawDispatchId: string, afterId?: 
             $unset: { claimToken: "" } }
     );
     const latest = await recipients.findOne({ _id: row._id });
-    if (latest) await syncRecipient(latest);
+    if (latest) await syncResultEmailRecipient(latest);
     if (result.success) counts.sent++;
     else counts.failed++;
   }
+  // Include claims acquired by another worker after our initial read.
+  const leased = await recipients.findOne(
+    { _id: { $in: rows.map((row) => row._id) }, status: "sending" },
+    { sort: { claimedAt: -1 }, projection: { claimedAt: 1 } },
+  );
   return {
     ...counts,
+    leaseUntil: leased?.claimedAt ? leased.claimedAt.getTime() + LEASE_MS : undefined,
     lastId: rows.at(-1)?._id?.toString(),
     done: rows.length < BATCH_SIZE,
   };
+}
+
+/** Read the current unresolved state after retries, including active leases. */
+export async function getResultEmailDispatchStatus(drawDispatchId: string) {
+  const recipients = await getResultEmailRecipientsCollection();
+  const filter = { drawDispatchId: new ObjectId(drawDispatchId) };
+  const [failed, uncertain, accepted] = await Promise.all([
+    recipients.countDocuments({ ...filter, status: { $in: ["pending", "sending", "failed"] } }),
+    recipients.countDocuments({ ...filter, status: "uncertain" }),
+    recipients.countDocuments({ ...filter, status: { $in: ["accepted", "delivered", "bounced", "delivery_failed"] } }),
+  ]);
+  return { failed, uncertain, accepted };
 }

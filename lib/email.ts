@@ -75,14 +75,14 @@ export async function sendWinnerEmail(ticket: EmailTicket): Promise<EmailResult>
     }, { idempotencyKey: `winner:${ticket.ticketId}` });
 
     if (error) {
-      console.error(`Failed to send email to ${ticket.email}:`, error);
+      console.error("Winner email provider request failed.");
       return { success: false, email: ticket.email, error: error.message };
     }
 
     return { success: true, email: ticket.email, messageId: data?.id };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
-    console.error(`Exception sending email to ${ticket.email}:`, message);
+    console.error("Winner email provider request threw an exception.");
     return { success: false, email: ticket.email, error: message };
   }
 }

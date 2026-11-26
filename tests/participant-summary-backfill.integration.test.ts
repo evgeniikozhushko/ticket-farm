@@ -1,3 +1,4 @@
+import { isLocalTestUri } from "../scripts/local-test-uri.mjs";
 import { randomUUID } from "node:crypto";
 import { MongoClient, type Db } from "mongodb";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -10,7 +11,7 @@ let db: Db;
 
 describe.skipIf(!uri)("participant summary backfill with real MongoDB", () => {
   beforeAll(async () => {
-    if (!/^mongodb:\/\/(127\.0\.0\.1|localhost):\d+\//.test(uri!)) {
+    if (!isLocalTestUri(uri)) {
       throw new Error("A local test MongoDB URI is required");
     }
     client = await MongoClient.connect(uri!);

@@ -61,8 +61,8 @@ it("records a delivered event using its recipient tag before acceptance is store
     { returnDocument: "after" }
   );
   expect(tickets.updateOne).toHaveBeenCalledWith(
-    { orgId: "org_a", date: "2026-09-14", ticketId: "TICKET001" },
-    { $set: expect.objectContaining({ emailSent: true, emailMessageId: "msg_1", emailDelivery: "delivered" }) }
+    expect.objectContaining({ orgId: "org_a", date: "2026-09-14", ticketId: "TICKET001", $expr: expect.anything() }),
+    expect.objectContaining({ $set: expect.objectContaining({ emailSent: true, emailMessageId: "msg_1", emailDelivery: "delivered" }) })
   );
 });
 
@@ -77,7 +77,7 @@ it("does not overwrite a newer bounce with an older delivery replay", async () =
   expect((await POST(request())).status).toBe(200);
   expect(tickets.updateOne).toHaveBeenCalledWith(
     expect.anything(),
-    { $set: expect.objectContaining({ emailDelivery: "bounced" }) }
+    expect.objectContaining({ $set: expect.objectContaining({ emailDelivery: "bounced" }) })
   );
 });
 
@@ -111,8 +111,8 @@ it("records a non-winner bounce on the matching registrant", async () => {
   const { POST } = await import("@/app/api/webhooks/resend/route");
   expect((await POST(request())).status).toBe(200);
   expect(registrants.updateOne).toHaveBeenCalledWith(
-    { orgId: "org_a", date: "2026-09-14", _id: registrantId },
-    { $set: expect.objectContaining({ nonWinnerEmailDelivery: "bounced", nonWinnerEmailMessageId: "msg_nw" }) }
+    expect.objectContaining({ orgId: "org_a", date: "2026-09-14", _id: registrantId, $expr: expect.anything() }),
+    expect.objectContaining({ $set: expect.objectContaining({ nonWinnerEmailDelivery: "bounced", nonWinnerEmailMessageId: "msg_nw" }) })
   );
 });
 
