@@ -100,6 +100,7 @@ export async function getTodayWinners(): Promise<WinnerInfo[] | null> {
           enteredAt: w.enteredAt.toISOString(),
           ticketNumber: ticket?.ticketNumber,
           ticketId: ticket?.ticketId,
+          ticketStatus: ticket?.status,
           emailSent: ticket?.emailSent,
           emailError: ticket?.emailError,
           emailDelivery: ticket?.emailDelivery,

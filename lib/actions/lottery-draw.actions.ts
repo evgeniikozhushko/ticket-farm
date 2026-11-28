@@ -292,6 +292,7 @@ export async function drawTodayLottery(
       enteredAt: r.enteredAt.toISOString(),
       ticketNumber: ticketDocuments[index].ticketNumber,
       ticketId: ticketDocuments[index].ticketId,
+      ticketStatus: "ACTIVE",
     }));
 
     return {

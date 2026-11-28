@@ -84,6 +84,8 @@ export interface Ticket {
   pickupTime: string;
   status: TicketStatus;
   checkedInAt?: Date | null;
+  canceledAt?: Date | null;
+  canceledBy?: string;
   generatedAt: Date;
   emailSent?: boolean;
   emailSentAt?: Date;
@@ -203,6 +205,7 @@ export interface WinnerInfo {
   enteredAt: string;
   ticketNumber?: number;
   ticketId?: string;
+  ticketStatus?: TicketStatus;
   emailSent?: boolean;
   emailError?: string;
   emailDelivery?: "delivered" | "bounced" | "failed";

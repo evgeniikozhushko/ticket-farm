@@ -35,6 +35,7 @@ import {
   retryTodayWinnerEmails,
 } from "@/lib/actions/lottery-draw.actions";
 import type { WinnerInfo, LotteryStatus } from "@/lib/types";
+import { ticketStatusLabels } from "@/lib/ticket-status";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface LotteryDrawPanelProps {
@@ -410,7 +411,10 @@ export function LotteryDrawPanel({
                           </p>
                         </div>
                       </div>
-                      <p className="mt-3 break-all font-mono text-xs text-muted-foreground">
+                      <p className="mt-3 text-sm">
+                        Ticket status: {winner.ticketStatus ? ticketStatusLabels[winner.ticketStatus] : "—"}
+                      </p>
+                      <p className="mt-1 break-all font-mono text-xs text-muted-foreground">
                         Ticket ID: {winner.ticketId || "—"}
                       </p>
                     </div>
@@ -425,6 +429,7 @@ export function LotteryDrawPanel({
                         <TableHead>Email</TableHead>
                         <TableHead>Ticket #</TableHead>
                         <TableHead>Ticket ID</TableHead>
+                        <TableHead>Ticket status</TableHead>
                         <TableHead className="w-24 text-center">
                           Email Status
                         </TableHead>
@@ -449,6 +454,9 @@ export function LotteryDrawPanel({
                           </TableCell>
                           <TableCell className="min-w-48 break-all font-mono text-sm text-muted-foreground">
                             {winner.ticketId || "—"}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap">
+                            {winner.ticketStatus ? ticketStatusLabels[winner.ticketStatus] : "—"}
                           </TableCell>
                           <TableCell className="text-center">
                             {winner.emailDelivery === "bounced" || winner.emailDelivery === "failed" ? (

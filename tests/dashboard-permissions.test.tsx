@@ -18,6 +18,7 @@ vi.mock("@/lib/actions/lottery-draw.actions", () => ({
   retryTodayWinnerEmails: vi.fn(),
 }));
 vi.mock("@/lib/actions/ticket-redemption.actions", () => ({
+  cancelTicketReference: vi.fn(),
   lookupTicketReference: vi.fn(),
   redeemTicketReference: vi.fn(),
 }));
@@ -49,7 +50,7 @@ describe("lottery dashboard permissions", () => {
     winnersMock.mockReset().mockResolvedValue([{
       _id: "registrant_1", name: "Ada", email: "ada@example.com",
       enteredAt: "2026-09-20T12:00:00Z", ticketNumber: 1,
-      ticketId: "4ISW51HA9O0Z", emailSent: false,
+      ticketId: "4ISW51HA9O0Z", ticketStatus: "CANCELED", emailSent: false,
     }]);
   });
 
@@ -64,6 +65,8 @@ describe("lottery dashboard permissions", () => {
     expect(html).toContain("Registrants: 1");
     expect(html).toContain("Ada");
     expect(html).toContain("4ISW51HA9O0Z");
+    expect(html.match(/Canceled/g)).toHaveLength(2);
+    expect(html).toContain("Ticket status: Canceled");
     expect(html).toContain("Ticket pickup");
     expect(html).toContain("Reference");
     expect(html).toContain("Find ticket");

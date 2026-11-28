@@ -74,7 +74,7 @@ export default async function LotteryAdminPage() {
               drawnAt={serializedStats.drawnAt}
             />
 
-            <TicketRedemptionPanel />
+            <TicketRedemptionPanel isAdmin={orgRole === "org:admin"} />
 
             {/* All Registrants Table */}
             {serializedStats.totalRegistrants > serializedRegistrants.length && (

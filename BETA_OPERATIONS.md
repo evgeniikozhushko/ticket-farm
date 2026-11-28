@@ -46,6 +46,16 @@ and an operator who receives and responds to them.
    webhooks, and job processing before resuming sends or admissions. A code rollback
    does not reverse database writes or messages already sent.
 
+## Participant summary repair
+
+Before rolling out ticket cancellation, confirm that the production backfill
+ran and its rebuilt summary count was validated. Check Atlas or the release
+operations records for that evidence.
+
+Run any rebuild during a maintenance window using the
+[MongoDB Atlas backfill procedure](BETA_DEPLOY_CHECKLIST.md#1-mongodb-atlas).
+Pause registration, draws, redemption, and cancellation for the entire rebuild.
+
 ## Backup restore drill
 
 1. Verify actual Atlas backup coverage, retention, latest successful snapshot, and

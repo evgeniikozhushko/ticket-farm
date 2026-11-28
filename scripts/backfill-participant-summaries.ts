@@ -2,8 +2,9 @@
  * Rebuild participant_summaries from registrants and tickets.
  *
  * Run only during a maintenance window, after creating the summary indexes and
- * before deploying the summary readers. Registration, draws, and redemption
- * must remain paused for the whole rebuild; this script replaces derived data.
+ * before deploying the summary readers. Registration, draws, redemption, and
+ * cancellation must remain paused for the whole rebuild because this script
+ * replaces derived data.
  *
  * Usage: pnpm tsx scripts/backfill-participant-summaries.ts
  */

@@ -1,3 +1,34 @@
+# Ticket cancellation
+
+## Plan
+
+- [x] Verify `feat/dashboard-ui` has no pending changes or unpushed commits and inspect ticket pickup, participant summaries, and the roadmap.
+- [x] Add an organization-admin cancellation action using the same conditional ticket write as redemption. In one MongoDB transaction, cancel the active ticket, decrement the participant's active-ticket count, and record the actor, timestamp, and state transition on the ticket alongside its organization and Reference.
+- [x] Add a confirmed Cancel ticket action to the Ticket pickup panel for admins. Display ticket status in pickup, both winners layouts, and participant history. Refresh the affected data after cancellation.
+- [x] Verify that members and other organizations cannot cancel, checked-in and canceled tickets reject repeat changes, and concurrent cancellation and redemption produce one valid outcome with correct counts and audit data.
+- [x] Run targeted tests with the disposable MongoDB replica set, lint, and type checking. Review the diff and record results.
+
+## Summary mismatch follow-up
+
+- [x] Explain rollback on summary mismatch, fix the mobile label, and document the repair procedure.
+- [x] Cover missing and zero-count summaries and unexpected errors. Run targeted and replica-set tests, lint, and TypeScript, then review the diff.
+
+The follow-up now tells admins to contact support when a summary mismatch rolls
+back cancellation. Both rollback cases preserved the original ticket and
+summary state. The mobile label matches the other ticket labels.
+
+Verification passed for the 26 targeted tests and all 289 tests across 36 files
+on the disposable MongoDB replica set, as well as lint, TypeScript, and
+`git diff --check`. The [production backfill evidence](../BETA_OPERATIONS.md#participant-summary-repair)
+still needs operator verification before rollout.
+
+## Review
+
+- Ticket pickup now offers a confirmation step for admins. Cancellation records the actor and timestamp and decrements the participant's active-ticket count in one transaction. A missing or inconsistent active count rolls back the cancellation.
+- Pickup, both winners layouts, and participant history display ticket status. The confirmation explains that queued winner emails may still be sent. The snapshot-based worker and retry path can still send those emails, and the canceled Reference cannot be checked in.
+- Before the summary mismatch follow-up, 24 targeted unit and dashboard tests, 7 focused MongoDB tests, and all 286 tests across 36 files passed on the disposable replica set. Lint, TypeScript, and `git diff --check` passed.
+- A headless Chrome fixture with mocked server actions verified member controls, confirmation and dismissal, and status refresh in pickup and both winners layouts. Signed-in validation against a deployed app remains unverified.
+
 # Dashboard UI — sidebar cleanup (branch feat/dashboard-ui) — November 25, 2026
 
 - [x] Removed template "Quick Create" button and dead Inbox icon (no handlers) from `components/nav-main.tsx`.

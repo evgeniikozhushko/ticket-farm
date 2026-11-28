@@ -159,4 +159,95 @@ describe.skipIf(!uri)("real MongoDB draw and redemption", () => {
     expect(await redeemTicketReference("4ISW51HA9O0Z")).toMatchObject({ outcome: "invalid" });
     expect(await db.collection("tickets").findOne({ orgId: "org_b" })).toMatchObject({ status: "ACTIVE" });
   });
+
+  it("cancels once, preserves the win, and makes the Reference unusable for check-in", async () => {
+    await seedDraw();
+    const { drawTodayLottery } = await import("@/lib/actions/lottery-draw.actions");
+    const { cancelTicketReference, lookupTicketReference, redeemTicketReference } = await import("@/lib/actions/ticket-redemption.actions");
+    expect(await drawTodayLottery(1)).toMatchObject({ success: true, winners: [{ ticketStatus: "ACTIVE" }] });
+
+    const tickets = db.collection<Ticket>("tickets");
+    const ticket = (await tickets.findOne({ orgId: "org_a" }))!;
+    expect(await cancelTicketReference(ticket.ticketId)).toMatchObject({ outcome: "canceled" });
+    const canceled = (await tickets.findOne({ _id: ticket._id }))!;
+    expect(canceled).toMatchObject({ status: "CANCELED", canceledAt: expect.any(Date), canceledBy: "staff" });
+    expect(await lookupTicketReference(ticket.ticketId)).toMatchObject({
+      outcome: "already_canceled",
+      ticket: { canceledAt: canceled.canceledAt!.toISOString() },
+    });
+    expect(await cancelTicketReference(ticket.ticketId)).toMatchObject({ outcome: "already_canceled" });
+    expect(await redeemTicketReference(ticket.ticketId)).toMatchObject({ outcome: "already_canceled" });
+    expect(await tickets.findOne({ _id: ticket._id })).toEqual(canceled);
+
+    const { getTodayWinners } = await import("@/lib/actions/lottery-query.actions");
+    expect(await getTodayWinners()).toMatchObject([{ ticketId: ticket.ticketId, ticketStatus: "CANCELED" }]);
+    expect(await db.collection("participant_summaries").findOne({ orgId: "org_a", email: ticket.email })).toMatchObject({
+      winCount: 1,
+      activeTicketCount: 0,
+      checkedInTicketCount: 0,
+    });
+  });
+
+  it("lets exactly one of cancellation and redemption commit", async () => {
+    await seedDraw();
+    const { drawTodayLottery } = await import("@/lib/actions/lottery-draw.actions");
+    const { cancelTicketReference, redeemTicketReference } = await import("@/lib/actions/ticket-redemption.actions");
+    await drawTodayLottery(1);
+
+    const tickets = db.collection<Ticket>("tickets");
+    const ticket = (await tickets.findOne({ orgId: "org_a" }))!;
+    const [cancel, redeem] = await Promise.all([
+      cancelTicketReference(ticket.ticketId),
+      redeemTicketReference(ticket.ticketId),
+    ]);
+    const finalTicket = (await tickets.findOne({ _id: ticket._id }))!;
+    if (finalTicket.status === "CANCELED") {
+      expect(cancel.outcome).toBe("canceled");
+      expect(redeem.outcome).toBe("already_canceled");
+      expect(finalTicket).toMatchObject({ canceledAt: expect.any(Date), canceledBy: "staff" });
+      expect(finalTicket.checkedInAt).toBeFalsy();
+    } else {
+      expect(finalTicket.status).toBe("CHECKED_IN");
+      expect(cancel.outcome).toBe("already_redeemed");
+      expect(redeem.outcome).toBe("redeemed");
+      expect(finalTicket.checkedInAt).toBeInstanceOf(Date);
+      expect(finalTicket.canceledAt).toBeUndefined();
+      expect(finalTicket.canceledBy).toBeUndefined();
+    }
+    expect(await db.collection("participant_summaries").findOne({ orgId: "org_a", email: ticket.email })).toMatchObject({
+      winCount: 1,
+      activeTicketCount: 0,
+      checkedInTicketCount: finalTicket.status === "CHECKED_IN" ? 1 : 0,
+    });
+  });
+
+  it.each(["zero active count", "missing summary"])("rolls back cancellation with a %s", async (summaryState) => {
+    await seedDraw();
+    const { drawTodayLottery } = await import("@/lib/actions/lottery-draw.actions");
+    const { cancelTicketReference } = await import("@/lib/actions/ticket-redemption.actions");
+    await drawTodayLottery(1);
+
+    const tickets = db.collection<Ticket>("tickets");
+    const ticket = (await tickets.findOne({ orgId: "org_a" }))!;
+    const summaries = db.collection("participant_summaries");
+    const participant = { orgId: "org_a", email: ticket.email };
+    if (summaryState === "zero active count") {
+      await summaries.updateOne(participant, { $set: { activeTicketCount: 0 } });
+    } else {
+      await summaries.deleteOne(participant);
+    }
+    const summaryBefore = await summaries.findOne(participant);
+    if (summaryState === "zero active count") {
+      expect(summaryBefore).toMatchObject({ activeTicketCount: 0 });
+    } else {
+      expect(summaryBefore).toBeNull();
+    }
+
+    expect(await cancelTicketReference(ticket.ticketId)).toEqual({
+      outcome: "error",
+      message: "The ticket is still active. Contact support to repair the participant summary before retrying.",
+    });
+    expect(await tickets.findOne({ _id: ticket._id })).toEqual(ticket);
+    expect(await summaries.findOne(participant)).toEqual(summaryBefore);
+  });
 });

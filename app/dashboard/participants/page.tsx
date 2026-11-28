@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ticketStatusLabels } from "@/lib/ticket-status";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -267,7 +268,7 @@ export default async function ParticipantsPage({
                                 #{entry.ticketNumber} / {entry.ticketId}
                               </p>
                               <p className="text-xs text-muted-foreground">
-                                {entry.ticketStatus}
+                                {entry.ticketStatus && ticketStatusLabels[entry.ticketStatus]}
                                 {entry.checkedInAt && ` · Checked in ${new Date(entry.checkedInAt).toLocaleString()}`}
                               </p>
                             </div>
@@ -342,7 +343,7 @@ export default async function ParticipantsPage({
                                     #{entry.ticketNumber} / {entry.ticketId}
                                   </div>
                                   <div className="text-xs text-muted-foreground">
-                                    {entry.ticketStatus}
+                                    {entry.ticketStatus && ticketStatusLabels[entry.ticketStatus]}
                                     {entry.checkedInAt && ` · Checked in ${new Date(entry.checkedInAt).toLocaleString()}`}
                                   </div>
                                 </div>
